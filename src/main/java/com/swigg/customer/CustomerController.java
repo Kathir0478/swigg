@@ -22,6 +22,9 @@ public class CustomerController {
     @Autowired
     private CustomerService customerService;
 
+    @Autowired
+    private CustomerRepository customerRepository;
+
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<CustomerInitResponseDTO>> registerRequest(
@@ -83,9 +86,11 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<TokenResponseDTO>> loginVerify(
             @RequestBody CustomerLoginVerifyRequestDTO request) {
         try {
-            logger.info("Customer login verification request received for customerId: {}", request.getCustomerId());
-            TokenResponseDTO response = customerService.completeLogin(request.getCustomerId(), request.getOtpCode());
-            logger.info("Customer login successful for customerId: {}", request.getCustomerId());
+            logger.info("Customer login verification request received for phone: {}", request.getPhoneNumber());
+            Customer customer = customerRepository.findByUser_PhoneNumber(request.getPhoneNumber())
+                    .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+            TokenResponseDTO response = customerService.completeLogin(customer.getCustomerId(), request.getOtpCode());
+            logger.info("Customer login successful for phone: {}", request.getPhoneNumber());
             return ApiResponses.ok("Login successful", response);
         } catch (IllegalArgumentException e) {
             logger.warn("Customer login verification failed: {}", e.getMessage());

@@ -4,6 +4,7 @@ import com.swigg.customer.Customer;
 import com.swigg.customer.CustomerRepository;
 import com.swigg.food.Food;
 import com.swigg.food.FoodRepository;
+import com.swigg.order.RiderNotificationService;
 import com.swigg.restaurant.Restaurant;
 import com.swigg.restaurant.RestaurantRepository;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,9 @@ public class CartService {
 
     @Autowired
     private CacheManager cacheManager;
+
+    @Autowired
+    private RiderNotificationService riderNotificationService;
 
     @Transactional
     @CacheEvict(value = "carts", allEntries = true)
@@ -203,7 +208,19 @@ public class CartService {
         Cart updatedCart = cartRepository.save(cart);
         logger.info("Order placed successfully for cart: {} with {} items, total: {}", cartId, cart.getFoodIds().size(), cart.getTotalPrice());
 
+        sendRiderNotificationsAsync(updatedCart.getCartId());
+
         return mapToResponseDTO(updatedCart);
+    }
+
+    @Async
+    private void sendRiderNotificationsAsync(UUID cartId) {
+        try {
+            logger.info("Sending rider notifications for cart: {}", cartId);
+            riderNotificationService.sendNotificationsToNearbyRiders(cartId);
+        } catch (Exception e) {
+            logger.error("Failed to send rider notifications for cart: {}", cartId, e);
+        }
     }
 
     @Transactional
