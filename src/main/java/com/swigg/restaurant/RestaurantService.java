@@ -1,10 +1,11 @@
 package com.swigg.restaurant;
 
 import com.swigg.auth.AuthService;
+import com.swigg.auth.AsyncOtpService;
 import com.swigg.auth.TokenResponseDTO;
 import com.swigg.auth.TotpService;
+import com.swigg.geocoding.AsyncGeocodingService;
 import com.swigg.geocoding.GeocodingService;
-import com.swigg.geocoding.ReverseGeocodingResponseDTO;
 import com.swigg.messaging.OtpSentResponseDTO;
 import com.swigg.messaging.OtpService;
 import com.swigg.user.Role;
@@ -13,11 +14,12 @@ import com.swigg.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +29,13 @@ public class RestaurantService {
     private static final Logger logger = LoggerFactory.getLogger(RestaurantService.class);
 
     @Autowired
+    private CacheManager cacheManager;
+
+    @Autowired
     private GeocodingService geocodingService;
+
+    @Autowired
+    private AsyncGeocodingService asyncGeocodingService;
 
     @Autowired
     private RestaurantRepository restaurantRepository;
@@ -40,6 +48,9 @@ public class RestaurantService {
 
     @Autowired
     private TotpService totpService;
+
+    @Autowired
+    private AsyncOtpService asyncOtpService;
 
     @Autowired
     private AuthService authService;
@@ -74,10 +85,8 @@ public class RestaurantService {
             logger.warn("Restaurant registration failed: invalid coordinates for user '{}'", userId);
             throw new IllegalArgumentException("Invalid latitude or longitude coordinates");
         }
-        ReverseGeocodingResponseDTO address=geocodingService.reverseGeocode(request.getLat(),request.getLng());
-
         Restaurant existingRestaurant = restaurantRepository.findByUserId(userId).orElse(null);
-        if (existingRestaurant==null){
+        if (existingRestaurant == null) {
             Restaurant restaurant = Restaurant.builder()
                     .userId(userId)
                     .user(user)
@@ -85,21 +94,20 @@ public class RestaurantService {
                     .description(request.getDescription())
                     .lat(request.getLat())
                     .lng(request.getLng())
-                    .address(address.getAddress())
                     .isActive(true)
                     .isVerified(false)
                     .build();
 
-            populateAddressFromCoordinates(restaurant);
             restaurantRepository.save(restaurant);
+            asyncGeocodingService.scheduleAddressUpdate(request.getLat(), request.getLng(), userId, "RESTAURANT");
             logger.info("Restaurant created in database for userId: {} with isVerified=false", userId);
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("RESTAURANT REGISTER TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "RESTAURANT_REGISTER");
+        logger.info("Restaurant registration OTP send initiated asynchronously for userId: {}", userId);
 
         String maskedPhone = OtpService.maskPhoneNumber(user.getPhoneNumber());
-        logger.info("Restaurant registration verification code generated for userId: {}. Awaiting verification.", userId);
+        logger.info("Restaurant registration verification code generation initiated for userId: {}. Awaiting verification.", userId);
 
         return new RestaurantInitResponseDTO(
                 "Verification code sent to your mobile number",
@@ -134,49 +142,54 @@ public class RestaurantService {
         user.setRole(Role.RESTAURANT);
         userRepository.save(user);
         Restaurant updatedRestaurant = restaurantRepository.save(restaurant);
+        evictRestaurantCache(updatedRestaurant.getRestaurantId());
         logger.info("Restaurant verified successfully for userId: {} with isVerified=true and role=RESTAURANT", userId);
 
         return updatedRestaurant;
     }
 
-    public RestaurantInitResponseDTO initiateLogin(String username, String password) {
-        logger.info("Restaurant login initiated for username: {}", username);
+    public RestaurantInitResponseDTO initiateLogin(RestaurantLoginRequestDTO data) {
+        logger.info("Restaurant login initiated for username: {}", data.getUsername());
 
-        if (username == null || username.isBlank()) {
+        if (data.getUsername() == null || data.getUsername().isBlank()) {
             logger.warn("Restaurant login failed: username is required");
             throw new IllegalArgumentException("Username is required");
         }
-        if (password == null || password.isBlank()) {
+        if (data.getPassword() == null || data.getPassword().isBlank()) {
+            logger.warn("Restaurant login failed: password is required");
+            throw new IllegalArgumentException("Password is required");
+        }
+        if (data.getPhoneNumber()==null || data.getPhoneNumber().isBlank()){
             logger.warn("Restaurant login failed: password is required");
             throw new IllegalArgumentException("Password is required");
         }
 
-        Restaurant restaurant = restaurantRepository.findByUser_UserName(username)
+        Restaurant restaurant = restaurantRepository.findByUser_PhoneNumber(data.getPhoneNumber())
                 .orElseThrow(() -> {
-                    logger.warn("Restaurant login failed: restaurant '{}' not found", username);
+                    logger.warn("Restaurant login failed: restaurant '{}' not found", data.getUsername());
                     return new IllegalArgumentException("Invalid username or password");
                 });
 
         if (!Boolean.TRUE.equals(restaurant.getIsActive())) {
-            logger.warn("Restaurant login failed: account deactivated for restaurant '{}'", username);
+            logger.warn("Restaurant login failed: account deactivated for restaurant '{}'", data.getUsername());
             throw new IllegalArgumentException("Account is deactivated");
         }
 
         if (!Boolean.TRUE.equals(restaurant.getIsVerified())) {
-            logger.warn("Restaurant login failed: account not verified for restaurant '{}'", username);
+            logger.warn("Restaurant login failed: account not verified for restaurant '{}'", data.getUsername());
             throw new IllegalArgumentException("Restaurant is not verified");
         }
 
         User user = restaurant.getUser();
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            logger.warn("Restaurant login failed: incorrect password for restaurant '{}'", username);
+        if (!passwordEncoder.matches(data.getPassword(), user.getPasswordHash())) {
+            logger.warn("Restaurant login failed: incorrect password for restaurant '{}'", data.getUsername());
             throw new IllegalArgumentException("Invalid username or password");
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("RESTAURANT LOGIN TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(user.getUserId().toString(), user.getPhoneNumber(), "RESTAURANT_LOGIN");
+        logger.info("Restaurant login OTP send initiated asynchronously for username: {}", data.getUsername());
 
-        logger.info("Restaurant login TOTP code generated for username: {}. Awaiting verification.", username);
+        logger.info("Restaurant login TOTP code generation initiated for username: {}. Awaiting verification.", data.getUsername());
         return new RestaurantInitResponseDTO(
                 "Verification code sent to your mobile number",
                 OtpService.maskPhoneNumber(user.getPhoneNumber())
@@ -228,8 +241,8 @@ public class RestaurantService {
         }
 
         User user = restaurant.getUser();
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("RESTAURANT DELETE TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "RESTAURANT_DELETE");
+        logger.info("Restaurant deletion OTP send initiated asynchronously for restaurantId: {}", userId);
 
         return new OtpSentResponseDTO(
                 "Verification code sent to your mobile number",
@@ -263,6 +276,7 @@ public class RestaurantService {
         user.setRole(Role.USER);
         userRepository.save(user);
         restaurantRepository.save(restaurant);
+        evictRestaurantCache(restaurant.getRestaurantId());
         logger.info("Restaurant deactivated successfully for restaurantId: {} and role changed back to USER", userId);
     }
 
@@ -296,26 +310,26 @@ public class RestaurantService {
         if (request.getImageUrl() != null) {
             restaurant.setImageUrl(request.getImageUrl());
         }
-        boolean addressChange=false;
+        boolean coordinatesChanged = false;
         if (request.getLat() != null) {
             restaurant.setLat(request.getLat());
-            addressChange=true;
+            coordinatesChanged = true;
         }
         if (request.getLng() != null) {
             restaurant.setLng(request.getLng());
-            addressChange=true;
+            coordinatesChanged = true;
         }
-        if (addressChange){
-            ReverseGeocodingResponseDTO location=geocodingService.reverseGeocode(restaurant.getLat(),restaurant.getLng());
-            restaurant.setAddress(location.getAddress());
-        }
-        populateAddressFromCoordinates(restaurant);
 
         Restaurant updatedRestaurant = restaurantRepository.save(restaurant);
+        evictRestaurantCache(updatedRestaurant.getRestaurantId());
+        if (coordinatesChanged) {
+            asyncGeocodingService.scheduleAddressUpdate(restaurant.getLat(), restaurant.getLng(), restaurantId, "RESTAURANT");
+        }
         logger.info("Restaurant updated successfully for restaurantId: {}", restaurantId);
         return updatedRestaurant;
     }
 
+    @Cacheable(value = "restaurants", key = "'all'")
     public List<Restaurant> listAllRestaurants() {
         logger.info("Fetching all active restaurants");
         List<Restaurant> restaurants = restaurantRepository.findAll();
@@ -323,6 +337,7 @@ public class RestaurantService {
         return restaurants;
     }
 
+    @Cacheable(value = "restaurant", key = "#restaurantId")
     public Restaurant getRestaurantById(UUID restaurantId) {
         logger.info("Fetching restaurant for restaurantId: {}", restaurantId);
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
@@ -340,21 +355,20 @@ public class RestaurantService {
         return restaurant;
     }
 
-    private void populateAddressFromCoordinates(Restaurant restaurant) {
-        if (restaurant.getLat() == null || restaurant.getLng() == null) {
-            return;
-        }
-
-        if (restaurant.getAddress() != null && !restaurant.getAddress().isBlank()) {
-            return;
-        }
-
+    private void evictRestaurantCache(UUID restaurantId) {
         try {
-            ReverseGeocodingResponseDTO response = geocodingService.reverseGeocode(restaurant.getLat(), restaurant.getLng());
-            restaurant.setAddress(response.getAddress());
-            logger.info("Address populated via reverse geocoding for restaurant");
+            if (cacheManager != null) {
+                org.springframework.cache.Cache listCache = cacheManager.getCache("restaurants");
+                if (listCache != null) {
+                    listCache.clear();
+                }
+                org.springframework.cache.Cache detailCache = cacheManager.getCache("restaurant");
+                if (detailCache != null && restaurantId != null) {
+                    detailCache.evict(restaurantId);
+                }
+            }
         } catch (Exception e) {
-            logger.warn("Failed to reverse geocode coordinates. Continuing without address: {}", e.getMessage());
+            logger.error("Failed to evict restaurant cache for ID: {}", restaurantId, e);
         }
     }
 }

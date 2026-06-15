@@ -63,7 +63,7 @@ public class RestaurantController {
     public ResponseEntity<?> loginRequest(@RequestBody RestaurantLoginRequestDTO request) {
         logger.info("Restaurant login request received for username: {}", request.getUsername());
         try {
-            RestaurantInitResponseDTO response = restaurantService.initiateLogin(request.getUsername(), request.getPassword());
+            RestaurantInitResponseDTO response = restaurantService.initiateLogin(request);
             logger.info("Restaurant login TOTP code generated for username: {}", request.getUsername());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {

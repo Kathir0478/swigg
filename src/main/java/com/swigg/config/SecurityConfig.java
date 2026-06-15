@@ -1,5 +1,6 @@
-package com.swigg.auth;
+package com.swigg.config;
 
+import com.swigg.auth.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -17,7 +17,11 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "restaurants")
+@Table(name = "restaurants", indexes = {
+    @Index(name = "idx_restaurants_userid", columnList = "userid"),
+    @Index(name = "idx_restaurants_isactive_isverified", columnList = "isactive,isverified"),
+    @Index(name = "idx_restaurants_geo", columnList = "lat,lng")
+})
 @Getter
 @Setter
 @NoArgsConstructor
