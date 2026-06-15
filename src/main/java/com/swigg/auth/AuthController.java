@@ -1,9 +1,10 @@
 package com.swigg.auth;
 
+import com.swigg.common.ApiResponse;
+import com.swigg.common.ApiResponses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,15 +21,18 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequestDTO request) {
+    public ResponseEntity<ApiResponse<TokenResponseDTO>> refresh(@RequestBody RefreshTokenRequestDTO request) {
         logger.info("Token refresh request received");
         try {
             TokenResponseDTO response = authService.refreshTokens(request);
             logger.info("Token refresh successful");
-            return ResponseEntity.ok(response);
+            return ApiResponses.ok("Token refresh successful", response);
         } catch (IllegalArgumentException e) {
             logger.warn("Token refresh failed. Reason: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+            return ApiResponses.unauthorized(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Token refresh error", e);
+            return ApiResponses.internalError();
         }
     }
 }

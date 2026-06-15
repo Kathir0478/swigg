@@ -1,11 +1,11 @@
 package com.swigg.food;
 
 import com.swigg.common.ApiResponse;
+import com.swigg.common.ApiResponses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -26,43 +26,26 @@ public class FoodController {
 
     @PostMapping("/create")
     @PreAuthorize("hasRole('RESTAURANT')")
-    public ResponseEntity<?> createFood(
+    public ResponseEntity<ApiResponse<FoodResponseDTO>> createFood(
             @Valid @RequestBody FoodRequestDTO request,
             Authentication authentication) {
         try {
             logger.info("Food creation request received");
             UUID restaurantId = UUID.fromString(authentication.getName());
             FoodResponseDTO food = foodService.createFood(restaurantId, request);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(true)
-                            .message("Food created successfully")
-                            .data(food)
-                            .build()
-            );
+            return ApiResponses.created("Food created successfully", food);
         } catch (IllegalArgumentException e) {
             logger.warn("Food creation failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Food creation error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @PutMapping("/{foodId}/update")
     @PreAuthorize("hasRole('RESTAURANT')")
-    public ResponseEntity<?> updateFood(
+    public ResponseEntity<ApiResponse<FoodResponseDTO>> updateFood(
             @PathVariable UUID foodId,
             @Valid @RequestBody FoodRequestDTO request,
             Authentication authentication) {
@@ -70,268 +53,138 @@ public class FoodController {
             logger.info("Food update request received for foodId: {}", foodId);
             UUID restaurantId = UUID.fromString(authentication.getName());
             FoodResponseDTO food = foodService.updateFood(restaurantId, foodId, request);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(true)
-                            .message("Food updated successfully")
-                            .data(food)
-                            .build()
-            );
+            return ApiResponses.ok("Food updated successfully", food);
         } catch (IllegalArgumentException e) {
             logger.warn("Food update failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Food update error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @DeleteMapping("/{foodId}")
     @PreAuthorize("hasRole('RESTAURANT')")
-    public ResponseEntity<?> deleteFood(
+    public ResponseEntity<ApiResponse<Void>> deleteFood(
             @PathVariable UUID foodId,
             Authentication authentication) {
         try {
             logger.info("Food deletion request received for foodId: {}", foodId);
             UUID restaurantId = UUID.fromString(authentication.getName());
             foodService.deleteFood(restaurantId, foodId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<Void>builder()
-                            .success(true)
-                            .message("Food deleted successfully")
-                            .build()
-            );
+            return ApiResponses.ok("Food deleted successfully");
         } catch (IllegalArgumentException e) {
             logger.warn("Food deletion failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<Void>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Food deletion error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<Void>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @PatchMapping("/{foodId}/availability")
     @PreAuthorize("hasRole('RESTAURANT')")
-    public ResponseEntity<?> toggleAvailability(
+    public ResponseEntity<ApiResponse<FoodResponseDTO>> toggleAvailability(
             @PathVariable UUID foodId,
             Authentication authentication) {
         try {
             logger.info("Food availability toggle request received for foodId: {}", foodId);
             UUID restaurantId = UUID.fromString(authentication.getName());
             FoodResponseDTO food = foodService.toggleAvailability(restaurantId, foodId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(true)
-                            .message("Food availability toggled successfully")
-                            .data(food)
-                            .build()
-            );
+            return ApiResponses.ok("Food availability toggled successfully", food);
         } catch (IllegalArgumentException e) {
             logger.warn("Availability toggle failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Availability toggle error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @GetMapping("/restaurant/{restaurantId}")
     @PreAuthorize("isAuthenticated()")
     @Cacheable(value = "foods", key = "'restaurant_' + #restaurantId")
-    public ResponseEntity<?> getFoodsByRestaurant(
+    public ResponseEntity<ApiResponse<List<FoodResponseDTO>>> getFoodsByRestaurant(
             @PathVariable UUID restaurantId) {
         try {
             logger.info("Fetching foods for restaurant: {}", restaurantId);
             List<FoodResponseDTO> foods = foodService.getFoodsByRestaurant(restaurantId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(true)
-                            .message("Foods fetched successfully")
-                            .count(foods.size())
-                            .data(foods)
-                            .build()
-            );
+            return ApiResponses.ok("Foods fetched successfully", foods, foods.size());
         } catch (Exception e) {
             logger.error("Error fetching foods for restaurant", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @GetMapping("/restaurant/{restaurantId}/available")
     @PreAuthorize("isAuthenticated()")
     @Cacheable(value = "foods", key = "'restaurant_available_' + #restaurantId")
-    public ResponseEntity<?> getAvailableFoodsByRestaurant(
+    public ResponseEntity<ApiResponse<List<FoodResponseDTO>>> getAvailableFoodsByRestaurant(
             @PathVariable UUID restaurantId) {
         try {
             logger.info("Fetching available foods for restaurant: {}", restaurantId);
             List<FoodResponseDTO> foods = foodService.getAvailableFoodsByRestaurant(restaurantId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(true)
-                            .message("Available foods fetched successfully")
-                            .count(foods.size())
-                            .data(foods)
-                            .build()
-            );
+            return ApiResponses.ok("Available foods fetched successfully", foods, foods.size());
         } catch (Exception e) {
             logger.error("Error fetching available foods", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @GetMapping("/restaurant/{restaurantId}/category/{category}")
     @PreAuthorize("isAuthenticated()")
     @Cacheable(value = "foods", key = "'category_' + #restaurantId + '_' + #category")
-    public ResponseEntity<?> getFoodsByCategory(
+    public ResponseEntity<ApiResponse<List<FoodResponseDTO>>> getFoodsByCategory(
             @PathVariable UUID restaurantId,
             @PathVariable String category) {
         try {
             logger.info("Fetching foods by category: {} for restaurant: {}", category, restaurantId);
             FoodCategory foodCategory = FoodCategory.valueOf(category.toUpperCase());
             List<FoodResponseDTO> foods = foodService.getFoodsByCategory(restaurantId, foodCategory);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(true)
-                            .message("Foods fetched successfully")
-                            .count(foods.size())
-                            .data(foods)
-                            .build()
-            );
+            return ApiResponses.ok("Foods fetched successfully", foods, foods.size());
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid category: {}", category);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(false)
-                            .message("Invalid category: " + category)
-                            .build()
-            );
+            return ApiResponses.badRequest("Invalid category: " + category);
         } catch (Exception e) {
             logger.error("Error fetching foods by category", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @GetMapping("/{foodId}")
     @PreAuthorize("isAuthenticated()")
     @Cacheable(value = "foods", key = "'food_' + #foodId")
-    public ResponseEntity<?> getFoodById(
-            @PathVariable UUID foodId) {
+    public ResponseEntity<ApiResponse<FoodResponseDTO>> getFoodById(@PathVariable UUID foodId) {
         try {
             logger.info("Fetching food: {}", foodId);
             FoodResponseDTO food = foodService.getFoodById(foodId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(true)
-                            .message("Food fetched successfully")
-                            .data(food)
-                            .build()
-            );
+            return ApiResponses.ok("Food fetched successfully", food);
         } catch (IllegalArgumentException e) {
             logger.warn("Food not found: {}", foodId);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.notFound(e.getMessage());
         } catch (Exception e) {
             logger.error("Error fetching food", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<FoodResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @GetMapping("/restaurant/{restaurantId}/category/{category}/rated")
     @PreAuthorize("isAuthenticated()")
     @Cacheable(value = "foods", key = "'category_rated_' + #restaurantId + '_' + #category")
-    public ResponseEntity<?> getTopRatedFoodsByCategory(
+    public ResponseEntity<ApiResponse<List<FoodResponseDTO>>> getTopRatedFoodsByCategory(
             @PathVariable UUID restaurantId,
             @PathVariable String category) {
         try {
             logger.info("Fetching top-rated foods by category: {} for restaurant: {}", category, restaurantId);
             FoodCategory foodCategory = FoodCategory.valueOf(category.toUpperCase());
             List<FoodResponseDTO> foods = foodService.getTopRatedFoodsByCategory(restaurantId, foodCategory);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(true)
-                            .message("Top-rated foods fetched successfully")
-                            .count(foods.size())
-                            .data(foods)
-                            .build()
-            );
+            return ApiResponses.ok("Top-rated foods fetched successfully", foods, foods.size());
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid category: {}", category);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(false)
-                            .message("Invalid category: " + category)
-                            .build()
-            );
+            return ApiResponses.badRequest("Invalid category: " + category);
         } catch (Exception e) {
             logger.error("Error fetching top-rated foods", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<List<FoodResponseDTO>>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 }

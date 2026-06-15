@@ -1,11 +1,11 @@
 package com.swigg.cart;
 
 import com.swigg.common.ApiResponse;
+import com.swigg.common.ApiResponses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -32,30 +32,13 @@ public class CartController {
             logger.info("Cart creation request received");
             UUID customerId = UUID.fromString(authentication.getName());
             CartResponseDTO cart = cartService.createCart(customerId, request);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(true)
-                            .message("Cart created successfully")
-                            .data(cart)
-                            .build()
-            );
+            return ApiResponses.created("Cart created successfully", cart);
         } catch (IllegalArgumentException e) {
             logger.warn("Cart creation failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Cart creation error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
@@ -69,66 +52,31 @@ public class CartController {
             logger.info("Fetching cart: {}", cartId);
             UUID customerId = UUID.fromString(authentication.getName());
             CartResponseDTO cart = cartService.getCartById(customerId, cartId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(true)
-                            .message("Cart fetched successfully")
-                            .data(cart)
-                            .build()
-            );
+            return ApiResponses.ok("Cart fetched successfully", cart);
         } catch (IllegalArgumentException e) {
             logger.warn("Cart fetch failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.notFound(e.getMessage());
         } catch (Exception e) {
             logger.error("Cart fetch error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
     @GetMapping("/active")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Cacheable(value = "carts", key = "'customer_active_' + #customerId")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> getActiveCart(
-            Authentication authentication) {
+    public ResponseEntity<ApiResponse<CartResponseDTO>> getActiveCart(Authentication authentication) {
         try {
             logger.info("Fetching active cart for customer");
             UUID customerId = UUID.fromString(authentication.getName());
             CartResponseDTO cart = cartService.getActiveCartByCustomer(customerId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(true)
-                            .message("Active cart fetched successfully")
-                            .data(cart)
-                            .build()
-            );
+            return ApiResponses.ok("Active cart fetched successfully", cart);
         } catch (IllegalArgumentException e) {
             logger.warn("Active cart fetch failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.notFound(e.getMessage());
         } catch (Exception e) {
             logger.error("Active cart fetch error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
@@ -142,30 +90,13 @@ public class CartController {
             logger.info("Adding item to cart: {}", cartId);
             UUID customerId = UUID.fromString(authentication.getName());
             CartResponseDTO cart = cartService.addItemToCart(customerId, cartId, request);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(true)
-                            .message("Item added to cart successfully")
-                            .data(cart)
-                            .build()
-            );
+            return ApiResponses.ok("Item added to cart successfully", cart);
         } catch (IllegalArgumentException e) {
             logger.warn("Add to cart failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Add to cart error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
@@ -180,30 +111,13 @@ public class CartController {
             logger.info("Removing item from cart: {}", cartId);
             UUID customerId = UUID.fromString(authentication.getName());
             CartResponseDTO cart = cartService.removeItemFromCart(customerId, cartId, foodId, quantity);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(true)
-                            .message("Item removed from cart successfully")
-                            .data(cart)
-                            .build()
-            );
+            return ApiResponses.ok("Item removed from cart successfully", cart);
         } catch (IllegalArgumentException e) {
             logger.warn("Remove from cart failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Remove from cart error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
@@ -216,30 +130,13 @@ public class CartController {
             logger.info("Placing order for cart: {}", cartId);
             UUID customerId = UUID.fromString(authentication.getName());
             CartResponseDTO cart = cartService.placeOrder(customerId, cartId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(true)
-                            .message("Order placed successfully")
-                            .data(cart)
-                            .build()
-            );
+            return ApiResponses.ok("Order placed successfully", cart);
         } catch (IllegalArgumentException e) {
             logger.warn("Place order failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Place order error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<CartResponseDTO>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 
@@ -252,29 +149,13 @@ public class CartController {
             logger.info("Deleting cart: {}", cartId);
             UUID customerId = UUID.fromString(authentication.getName());
             cartService.deleteCart(customerId, cartId);
-
-            return ResponseEntity.ok(
-                    ApiResponse.<Void>builder()
-                            .success(true)
-                            .message("Cart deleted successfully")
-                            .build()
-            );
+            return ApiResponses.ok("Cart deleted successfully");
         } catch (IllegalArgumentException e) {
             logger.warn("Delete cart failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    ApiResponse.<Void>builder()
-                            .success(false)
-                            .message(e.getMessage())
-                            .build()
-            );
+            return ApiResponses.badRequest(e.getMessage());
         } catch (Exception e) {
             logger.error("Delete cart error", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    ApiResponse.<Void>builder()
-                            .success(false)
-                            .message("Internal server error")
-                            .build()
-            );
+            return ApiResponses.internalError();
         }
     }
 }
