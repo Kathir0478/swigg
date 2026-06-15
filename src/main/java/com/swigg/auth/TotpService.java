@@ -1,8 +1,10 @@
 package com.swigg.auth;
 
+import com.swigg.config.TotpConfig;
 import org.apache.commons.codec.binary.Base32;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
@@ -15,16 +17,14 @@ import java.security.SecureRandom;
 public class TotpService {
 
     private static final Logger logger = LoggerFactory.getLogger(TotpService.class);
-    private static final String ALGORITHM = "HmacSHA1";
-    private static final int TIME_STEP = 30;
-    private static final int TOTP_LENGTH = 6;
-    private static final int SECRET_LENGTH = 32;
-    private static final int VERIFICATION_WINDOW = 1;
+
+    @Autowired
+    private TotpConfig totpConfig;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
     public String generateSecret() {
-        byte[] randomBytes = new byte[SECRET_LENGTH];
+        byte[] randomBytes = new byte[totpConfig.getSecretLength()];
         secureRandom.nextBytes(randomBytes);
         Base32 base32 = new Base32();
         String secret = base32.encodeToString(randomBytes).replaceAll("=", "");
@@ -34,7 +34,7 @@ public class TotpService {
 
     public String generateTotp(String secret, long timestamp) {
         try {
-            long timeCounter = timestamp / 1000 / TIME_STEP;
+            long timeCounter = timestamp / 1000 / totpConfig.getTimeStep();
             return computeTotp(secret, timeCounter);
         } catch (Exception e) {
             logger.error("Error generating TOTP code", e);
@@ -43,7 +43,7 @@ public class TotpService {
     }
 
     public boolean verifyTotp(String secret, String code, long timestamp) {
-        return verifyTotp(secret, code, timestamp, VERIFICATION_WINDOW);
+        return verifyTotp(secret, code, timestamp, totpConfig.getWindow());
     }
 
     public boolean verifyTotp(String secret, String code, long timestamp, int windowSize) {
@@ -53,12 +53,12 @@ public class TotpService {
                 return false;
             }
 
-            long timeCounter = timestamp / 1000 / TIME_STEP;
+            long timeCounter = timestamp / 1000 / totpConfig.getTimeStep();
 
             for (int i = -windowSize; i <= windowSize; i++) {
                 String expectedCode = computeTotp(secret, timeCounter + i);
                 if (expectedCode.equals(code.trim())) {
-                    logger.debug("TOTP verified successfully within window");
+                    logger.debug("TOTP verified successfully within window of {} time steps", windowSize);
                     return true;
                 }
             }
@@ -83,8 +83,8 @@ public class TotpService {
             timeCounter >>= 8;
         }
 
-        Mac mac = Mac.getInstance(ALGORITHM);
-        SecretKeySpec keySpec = new SecretKeySpec(secretBytes, 0, secretBytes.length, ALGORITHM);
+        Mac mac = Mac.getInstance(totpConfig.getAlgorithm());
+        SecretKeySpec keySpec = new SecretKeySpec(secretBytes, 0, secretBytes.length, totpConfig.getAlgorithm());
         mac.init(keySpec);
 
         byte[] hash = mac.doFinal(message);
@@ -97,8 +97,8 @@ public class TotpService {
         }
 
         truncatedHash &= 0x7fffffff;
-        truncatedHash %= (int) Math.pow(10, TOTP_LENGTH);
+        truncatedHash %= (int) Math.pow(10, totpConfig.getLength());
 
-        return String.format("%0" + TOTP_LENGTH + "d", truncatedHash);
+        return String.format("%0" + totpConfig.getLength() + "d", truncatedHash);
     }
 }

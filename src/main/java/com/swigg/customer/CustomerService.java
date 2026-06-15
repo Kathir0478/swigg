@@ -1,10 +1,11 @@
 package com.swigg.customer;
 
 import com.swigg.auth.AuthService;
+import com.swigg.auth.AsyncOtpService;
 import com.swigg.auth.TokenResponseDTO;
 import com.swigg.auth.TotpService;
+import com.swigg.geocoding.AsyncGeocodingService;
 import com.swigg.geocoding.GeocodingService;
-import com.swigg.geocoding.ReverseGeocodingResponseDTO;
 import com.swigg.messaging.OtpSentResponseDTO;
 import com.swigg.messaging.OtpService;
 import com.swigg.user.Role;
@@ -13,6 +14,8 @@ import com.swigg.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +29,13 @@ public class CustomerService {
     private static final Logger logger = LoggerFactory.getLogger(CustomerService.class);
 
     @Autowired
+    private CacheManager cacheManager;
+
+    @Autowired
     private GeocodingService geocodingService;
+
+    @Autowired
+    private AsyncGeocodingService asyncGeocodingService;
 
     @Autowired
     private CustomerRepository customerRepository;
@@ -39,6 +48,9 @@ public class CustomerService {
 
     @Autowired
     private TotpService totpService;
+
+    @Autowired
+    private AsyncOtpService asyncOtpService;
 
     @Autowired
     private AuthService authService;
@@ -68,13 +80,11 @@ public class CustomerService {
             throw new IllegalArgumentException("Invalid latitude or longitude coordinates");
         }
         Customer existingCustomer = customerRepository.findByUserId(userId).orElse(null);
-        if (existingCustomer==null){
-            ReverseGeocodingResponseDTO address = geocodingService.reverseGeocode(request.getLat(), request.getLng());
+        if (existingCustomer == null) {
             Customer customer = Customer.builder()
                     .userId(userId)
                     .user(user)
                     .name(user.getUserName())
-                    .address(address.getAddress())
                     .dob(request.getDob())
                     .gender(request.getGender())
                     .lat(request.getLat())
@@ -84,15 +94,15 @@ public class CustomerService {
                     .build();
 
             customerRepository.save(customer);
+            asyncGeocodingService.scheduleAddressUpdate(request.getLat(), request.getLng(), userId, "CUSTOMER");
             logger.info("Customer created in database for userId: {} with isVerified=false", userId);
         }
 
-
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("CUSTOMER REGISTER TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "CUSTOMER_REGISTER");
+        logger.info("Customer registration OTP send initiated asynchronously for userId: {}", userId);
 
         String maskedPhone = OtpService.maskPhoneNumber(user.getPhoneNumber());
-        logger.info("Customer registration verification code generated for userId: {}. Awaiting verification.", userId);
+        logger.info("Customer registration verification code generation initiated for userId: {}. Awaiting verification.", userId);
 
         return new CustomerInitResponseDTO(
                 "Verification code sent to your mobile number",
@@ -127,6 +137,7 @@ public class CustomerService {
         user.setRole(Role.CUSTOMER);
         userRepository.save(user);
         Customer updatedCustomer = customerRepository.save(customer);
+        evictCustomerCache(updatedCustomer.getCustomerId());
         logger.info("Customer verified successfully for userId: {} with isVerified=true and role=CUSTOMER", userId);
 
         return updatedCustomer;
@@ -166,10 +177,10 @@ public class CustomerService {
             throw new IllegalArgumentException("Invalid username or password");
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("CUSTOMER LOGIN TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(user.getUserId().toString(), user.getPhoneNumber(), "CUSTOMER_LOGIN");
+        logger.info("Customer login OTP send initiated asynchronously for username: {}", request.getUsername());
 
-        logger.info("Customer login TOTP code generated for username: {}. Awaiting verification.", request.getUsername());
+        logger.info("Customer login TOTP code generation initiated for username: {}. Awaiting verification.", request.getUsername());
         return new CustomerInitResponseDTO(
                 "Verification code sent to your mobile number",
                 OtpService.maskPhoneNumber(user.getPhoneNumber())
@@ -221,8 +232,8 @@ public class CustomerService {
         }
 
         User user = customer.getUser();
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("CUSTOMER DELETE TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "CUSTOMER_DELETE");
+        logger.info("Customer deletion OTP send initiated asynchronously for customerId: {}", userId);
 
         return new OtpSentResponseDTO(
                 "Verification code sent to your mobile number",
@@ -256,6 +267,7 @@ public class CustomerService {
         user.setRole(Role.USER);
         userRepository.save(user);
         customerRepository.save(customer);
+        evictCustomerCache(customer.getCustomerId());
         logger.info("Customer deactivated successfully for customerId: {} and role changed back to USER", userId);
     }
 
@@ -286,25 +298,26 @@ public class CustomerService {
         if (request.getGender() != null) {
             customer.setGender(request.getGender());
         }
-        boolean addressChange = false;
+        boolean coordinatesChanged = false;
         if (request.getLat() != null) {
             customer.setLat(request.getLat());
-            addressChange = true;
+            coordinatesChanged = true;
         }
         if (request.getLng() != null) {
             customer.setLng(request.getLng());
-            addressChange = true;
-        }
-        if (addressChange) {
-            ReverseGeocodingResponseDTO location = geocodingService.reverseGeocode(customer.getLat(), customer.getLng());
-            customer.setAddress(location.getAddress());
+            coordinatesChanged = true;
         }
 
         Customer updatedCustomer = customerRepository.save(customer);
+        evictCustomerCache(updatedCustomer.getCustomerId());
+        if (coordinatesChanged) {
+            asyncGeocodingService.scheduleAddressUpdate(customer.getLat(), customer.getLng(), customerId, "CUSTOMER");
+        }
         logger.info("Customer updated successfully for customerId: {}", customerId);
         return updatedCustomer;
     }
 
+    @Cacheable(value = "customers", key = "'all'")
     public List<Customer> listAllCustomers() {
         logger.info("Fetching all active customers");
         List<Customer> customers = customerRepository.findAll();
@@ -312,6 +325,7 @@ public class CustomerService {
         return customers;
     }
 
+    @Cacheable(value = "customer", key = "#customerId")
     public Customer getCustomerById(UUID customerId) {
         logger.info("Fetching customer for customerId: {}", customerId);
         Customer customer = customerRepository.findById(customerId)
@@ -327,5 +341,22 @@ public class CustomerService {
 
         logger.info("Successfully fetched customer for customerId: {}", customerId);
         return customer;
+    }
+
+    private void evictCustomerCache(UUID customerId) {
+        try {
+            if (cacheManager != null) {
+                org.springframework.cache.Cache listCache = cacheManager.getCache("customers");
+                if (listCache != null) {
+                    listCache.clear();
+                }
+                org.springframework.cache.Cache detailCache = cacheManager.getCache("customer");
+                if (detailCache != null && customerId != null) {
+                    detailCache.evict(customerId);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to evict customer cache for ID: {}", customerId, e);
+        }
     }
 }

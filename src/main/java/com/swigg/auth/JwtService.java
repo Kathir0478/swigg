@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,7 +39,14 @@ public class JwtService {
 
     @PostConstruct
     public void init() {
-        this.secretKey = Keys.hmacShaKeyFor(SECRET_STRING.getBytes());
+        if (SECRET_STRING == null || SECRET_STRING.isBlank()) {
+            throw new IllegalStateException("jwt.secret must be configured");
+        }
+        byte[] keyBytes = SECRET_STRING.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("jwt.secret must be at least 256 bits (32 bytes)");
+        }
+        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateAccessToken(AuthRequestDTO credentials) {
@@ -52,7 +60,7 @@ public class JwtService {
                 .subject(credentials.getUserId().toString())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
-                .signWith(secretKey)
+                .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -66,7 +74,7 @@ public class JwtService {
                 .subject(userId.toString())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
-                .signWith(secretKey)
+                .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
     }
 

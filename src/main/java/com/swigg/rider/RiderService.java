@@ -1,10 +1,11 @@
 package com.swigg.rider;
 
 import com.swigg.auth.AuthService;
+import com.swigg.auth.AsyncOtpService;
 import com.swigg.auth.TokenResponseDTO;
 import com.swigg.auth.TotpService;
+import com.swigg.geocoding.AsyncGeocodingService;
 import com.swigg.geocoding.GeocodingService;
-import com.swigg.geocoding.ReverseGeocodingResponseDTO;
 import com.swigg.messaging.OtpSentResponseDTO;
 import com.swigg.messaging.OtpService;
 import com.swigg.user.Role;
@@ -13,6 +14,8 @@ import com.swigg.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +29,13 @@ public class RiderService {
     private static final Logger logger = LoggerFactory.getLogger(RiderService.class);
 
     @Autowired
+    private CacheManager cacheManager;
+
+    @Autowired
     private GeocodingService geocodingService;
+
+    @Autowired
+    private AsyncGeocodingService asyncGeocodingService;
 
     @Autowired
     private RiderRepository riderRepository;
@@ -39,6 +48,9 @@ public class RiderService {
 
     @Autowired
     private TotpService totpService;
+
+    @Autowired
+    private AsyncOtpService asyncOtpService;
 
     @Autowired
     private AuthService authService;
@@ -72,15 +84,12 @@ public class RiderService {
             logger.warn("Rider registration failed: invalid coordinates for user '{}'", userId);
             throw new IllegalArgumentException("Invalid latitude or longitude coordinates");
         }
-        ReverseGeocodingResponseDTO address = geocodingService.reverseGeocode(request.getLat(), request.getLng());
-
         Rider existingRider = riderRepository.findByUserId(userId).orElse(null);
         if (existingRider == null) {
             Rider rider = Rider.builder()
                     .userId(userId)
                     .user(user)
                     .name(user.getUserName())
-                    .address(address.getAddress())
                     .dob(request.getDob())
                     .gender(request.getGender())
                     .lat(request.getLat())
@@ -92,14 +101,15 @@ public class RiderService {
                     .build();
 
             riderRepository.save(rider);
+            asyncGeocodingService.scheduleAddressUpdate(request.getLat(), request.getLng(), userId, "RIDER");
             logger.info("Rider created in database for userId: {} with isVerified=false", userId);
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("RIDER REGISTER TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "RIDER_REGISTER");
+        logger.info("Rider registration OTP send initiated asynchronously for userId: {}", userId);
 
         String maskedPhone = OtpService.maskPhoneNumber(user.getPhoneNumber());
-        logger.info("Rider registration verification code generated for userId: {}. Awaiting verification.", userId);
+        logger.info("Rider registration verification code generation initiated for userId: {}. Awaiting verification.", userId);
 
         return new RiderInitResponseDTO(
                 "Verification code sent to your mobile number",
@@ -134,6 +144,7 @@ public class RiderService {
         user.setRole(Role.RIDER);
         userRepository.save(user);
         Rider updatedRider = riderRepository.save(rider);
+        evictRiderCache(updatedRider.getRiderId());
         logger.info("Rider verified successfully for userId: {} with isVerified=true and role=RIDER", userId);
 
         return updatedRider;
@@ -173,10 +184,10 @@ public class RiderService {
             throw new IllegalArgumentException("Invalid username or password");
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("RIDER LOGIN TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(user.getUserId().toString(), user.getPhoneNumber(), "RIDER_LOGIN");
+        logger.info("Rider login OTP send initiated asynchronously for username: {}", username);
 
-        logger.info("Rider login TOTP code generated for username: {}. Awaiting verification.", username);
+        logger.info("Rider login TOTP code generation initiated for username: {}. Awaiting verification.", username);
         return new RiderInitResponseDTO(
                 "Verification code sent to your mobile number",
                 OtpService.maskPhoneNumber(user.getPhoneNumber())
@@ -228,8 +239,8 @@ public class RiderService {
         }
 
         User user = rider.getUser();
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("RIDER DELETE TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "RIDER_DELETE");
+        logger.info("Rider deletion OTP send initiated asynchronously for riderId: {}", userId);
 
         return new OtpSentResponseDTO(
                 "Verification code sent to your mobile number",
@@ -263,6 +274,7 @@ public class RiderService {
         user.setRole(Role.USER);
         userRepository.save(user);
         riderRepository.save(rider);
+        evictRiderCache(rider.getRiderId());
         logger.info("Rider deactivated successfully for riderId: {} and role changed back to USER", userId);
     }
 
@@ -299,25 +311,26 @@ public class RiderService {
         if (request.getDlNumber() != null) {
             rider.setDlNumber(request.getDlNumber());
         }
-        boolean addressChange = false;
+        boolean coordinatesChanged = false;
         if (request.getLat() != null) {
             rider.setLat(request.getLat());
-            addressChange = true;
+            coordinatesChanged = true;
         }
         if (request.getLng() != null) {
             rider.setLng(request.getLng());
-            addressChange = true;
-        }
-        if (addressChange) {
-            ReverseGeocodingResponseDTO location = geocodingService.reverseGeocode(rider.getLat(), rider.getLng());
-            rider.setAddress(location.getAddress());
+            coordinatesChanged = true;
         }
 
         Rider updatedRider = riderRepository.save(rider);
+        evictRiderCache(updatedRider.getRiderId());
+        if (coordinatesChanged) {
+            asyncGeocodingService.scheduleAddressUpdate(rider.getLat(), rider.getLng(), riderId, "RIDER");
+        }
         logger.info("Rider updated successfully for riderId: {}", riderId);
         return updatedRider;
     }
 
+    @Cacheable(value = "riders", key = "'all'")
     public List<Rider> listAllRiders() {
         logger.info("Fetching all active riders");
         List<Rider> riders = riderRepository.findAll();
@@ -325,6 +338,7 @@ public class RiderService {
         return riders;
     }
 
+    @Cacheable(value = "rider", key = "#riderId")
     public Rider getRiderById(UUID riderId) {
         logger.info("Fetching rider for riderId: {}", riderId);
         Rider rider = riderRepository.findById(riderId)
@@ -340,5 +354,22 @@ public class RiderService {
 
         logger.info("Successfully fetched rider for riderId: {}", riderId);
         return rider;
+    }
+
+    private void evictRiderCache(UUID riderId) {
+        try {
+            if (cacheManager != null) {
+                org.springframework.cache.Cache listCache = cacheManager.getCache("riders");
+                if (listCache != null) {
+                    listCache.clear();
+                }
+                org.springframework.cache.Cache detailCache = cacheManager.getCache("rider");
+                if (detailCache != null && riderId != null) {
+                    detailCache.evict(riderId);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to evict rider cache for ID: {}", riderId, e);
+        }
     }
 }

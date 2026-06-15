@@ -35,6 +35,9 @@ public class UserService {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private com.swigg.auth.AsyncOtpService asyncOtpService;
+
     @Transactional
     public SignupInitResponseDTO initSignup(SignupRequestDTO request) {
         String username = request.getUsername();
@@ -57,6 +60,7 @@ public class UserService {
         }
         User existingUser = userRepository.findByPhoneNumber(phoneNumber).orElse(null);
         String totpSecret;
+        UUID userId;
         if (existingUser==null){
             totpSecret = totpService.generateSecret();
             String passwordHash = passwordEncoder.encode(password);
@@ -71,17 +75,19 @@ public class UserService {
                     .build();
 
             User savedUser = userRepository.save(user);
+            userId = savedUser.getUserId();
             logger.info("User created in database for username: {} with isVerified=false", username);
         }
         else {
             totpSecret=existingUser.getTotpSecret();
+            userId = existingUser.getUserId();
         }
 
-        String totpCode = totpService.generateTotp(totpSecret, System.currentTimeMillis());
-        logger.warn("SIGNUP TOTP CODE FOR PHONE {}: {}", phoneNumber, totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), phoneNumber, "SIGNUP");
+        logger.info("Signup OTP send initiated asynchronously for username: {}", username);
 
         String maskedPhone = OtpService.maskPhoneNumber(phoneNumber);
-        logger.info("Signup verification code generated for username: {}. Awaiting verification.", username);
+        logger.info("Signup verification code generation initiated for username: {}. Awaiting verification.", username);
 
         return new SignupInitResponseDTO(
                 username,
@@ -134,8 +140,8 @@ public class UserService {
             throw new IllegalArgumentException("Account is already deactivated");
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("DELETE TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), user.getPhoneNumber(), "DELETE");
+        logger.info("Account deletion OTP send initiated asynchronously for userId: {}", userId);
 
         return new OtpSentResponseDTO(
                 "Verification code sent to your mobile number",
@@ -211,10 +217,10 @@ public class UserService {
             throw new IllegalArgumentException("Invalid username or password");
         }
 
-        String totpCode = totpService.generateTotp(user.getTotpSecret(), System.currentTimeMillis());
-        logger.warn("LOGIN TOTP CODE FOR PHONE {}: {}", user.getPhoneNumber(), totpCode);
+        asyncOtpService.generateAndSendOtpAsync(user.getUserId().toString(), user.getPhoneNumber(), "LOGIN");
+        logger.info("Login OTP send initiated asynchronously for username: {}", username);
 
-        logger.info("Login TOTP code generated for username: {}. Awaiting verification.", username);
+        logger.info("Login TOTP code generation initiated for username: {}. Awaiting verification.", username);
         return new LoginInitResponseDTO(
                 "Verification code sent to your mobile number",
                 OtpService.maskPhoneNumber(user.getPhoneNumber())

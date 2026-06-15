@@ -1,325 +1,239 @@
-# Swigg Application - Restaurant Module
+# Swigg Backend API
 
-A Spring Boot application with a **Restaurant module** featuring JPA, PostgreSQL database integration, Spring Security with JWT authentication, a global exception handling system, and SLF4J logging.
+A modern, scalable food delivery platform backend built with Spring Boot 3.3, featuring async processing, distributed caching, and event-driven architecture.
 
----
+## 🚀 Features
 
-## Technical Stack
-- **Language/Platform**: Java 21
-- **Framework**: Spring Boot 3.3.0
-- **Build Tool**: Maven
-- **Database**: PostgreSQL
-- **Authentication**: JWT (JSON Web Tokens) with HS256 encryption
+- **Async OTP Generation & Delivery**: Non-blocking OTP generation with RabbitMQ message queues
+- **Geocoding Service**: Address validation and reverse geocoding with Redis caching
+- **Distributed Caching**: Cache-aside pattern using Redis for improved performance
+- **Message-Driven Architecture**: RabbitMQ for OTP, Geocoding, and Logging events
+- **Database Optimization**: Strategic indexing on high-frequency query columns
+- **JWT Authentication**: Secure token-based authentication
+- **Role-Based Access Control**: Support for User, Customer, Restaurant, and Rider roles
+- **PostgreSQL Database**: Reliable relational data storage
 
----
+## ⚡ Quick Start
 
-## Getting Started
+### Using Docker Compose (Recommended)
+
+**Linux/macOS:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+**Windows:**
+```bash
+start.bat
+```
+
+**Application URL:** `http://localhost:8080/swigg`
+**RabbitMQ UI:** `http://localhost:15672` (guest/guest)
+
+## 🏗️ Architecture
+
+```
+Client → Spring Boot API → PostgreSQL (Data)
+                      ↓
+                   Redis (Cache)
+                      ↓
+                   RabbitMQ (Queues)
+                      ↓
+                  Message Listeners
+```
+
+## ⚙️ Configuration
+
+All configuration is in `src/main/resources/application.properties`
+
+### Key Settings
+
+```properties
+# Redis Caching
+cache.default-ttl=3600          # 1 hour
+cache.geocoding-ttl=3600        # 1 hour
+cache.otp-ttl=300               # 5 minutes
+
+# RabbitMQ Messaging
+rabbitmq.otp.queue=otp.queue
+rabbitmq.geocoding.queue=geocoding.queue
+rabbitmq.logging.queue=logging.queue
+
+# TOTP Settings
+totp.window=5                   # ~5 minutes
+totp.time-step=30               # 30 seconds per step
+```
+
+### Environment Profiles
+
+```bash
+# Development
+mvn spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=dev"
+
+# Production  
+mvn spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=prod"
+```
+
+## 📡 API Endpoints
+
+### Authentication
+- `POST /api/users/signup/request` - Sign up with OTP
+- `POST /api/users/signup/verify` - Verify signup
+- `POST /api/users/login/request` - Request login OTP
+- `POST /api/users/login/verify` - Verify login
+
+### Customer
+- `POST /api/customers/register/request` - Register (Async)
+- `POST /api/customers/login/request` - Login (Async)
+- `PUT /api/customers/update` - Update profile (Async geocoding)
+- `GET /api/customers/{id}` - Get details
+
+### Restaurant
+- `POST /api/restaurants/register/request` - Register (Async)
+- `POST /api/restaurants/login/request` - Login (Async)
+- `PUT /api/restaurants/update` - Update (Async geocoding)
+- `GET /api/restaurants/{id}` - Get details
+
+### Rider
+- `POST /api/riders/register/request` - Register (Async)
+- `POST /api/riders/login/request` - Login (Async)
+- `PUT /api/riders/update` - Update (Async geocoding)
+- `GET /api/riders/{id}` - Get details
+
+## 📚 Documentation
+
+- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - Complete setup and deployment guide
+- **[docker-compose.yml](./docker-compose.yml)** - Docker services configuration
+
+## 🔧 Development
 
 ### Prerequisites
-1. **Java Development Kit (JDK)**: Ensure JDK 21 is installed.
-2. **Apache Maven**: Ensure Maven is installed and added to your system path.
-3. **PostgreSQL**: Ensure PostgreSQL database server is running locally on port `5432`.
+- Java 21+
+- Maven 3.8+
+- Docker & Docker Compose
 
-### Database Setup
-1. Log in to your PostgreSQL instance (e.g., using `psql` or `pgAdmin`).
-2. Create a database named `swigg_db`:
-   ```sql
-   CREATE DATABASE swigg_db;
-   ```
-3. By default, the application is configured to connect to PostgreSQL with the following credentials (defined in `src/main/resources/application.properties`):
-   - **URL**: `jdbc:postgresql://localhost:5432/swigg_db`
-   - **Username**: `postgres`
-   - **Password**: `postgres`
-   
-   *Note: If your local PostgreSQL credentials differ, update the properties in [application.properties](file:///c:/Users/kathi/IdeaProjects/swigg/src/main/resources/application.properties) accordingly.*
-
-### Build and Compilation
-Build the application and download dependencies:
+### Build
 ```bash
-mvn clean compile
+mvn clean install -DskipTests
 ```
 
-### Running the Application
-Run the Spring Boot application using Maven:
+### Run Tests
 ```bash
-mvn spring-boot:run
+mvn test
 ```
-The application will start on port `8080` (base URL: `http://localhost:8080`).
+
+### Project Structure
+```
+src/main/java/com/swigg/
+├── auth/                # JWT & TOTP
+├── cache/               # Redis caching
+├── config/              # Spring configs
+├── customer/            # Customer module
+├── geocoding/           # Geocoding service
+├── messaging/           # SMS & events
+├── restaurant/          # Restaurant module
+├── rider/               # Rider module
+└── user/                # User module
+```
+
+## 🚀 Deployment
+
+### Docker
+```bash
+docker build -t swigg-app:1.0 .
+docker run -d -p 8080:8080 --env-file .env.prod swigg-app:1.0
+```
+
+### Kubernetes
+```bash
+kubectl create configmap swigg-config --from-file=application.properties
+kubectl apply -f k8s/deployment.yaml
+```
+
+## 🐛 Troubleshooting
+
+### Services Not Starting
+```bash
+# Check if containers are running
+docker-compose ps
+
+# Restart services
+docker-compose restart
+
+# View logs
+docker-compose logs -f <service-name>
+```
+
+### Database Connection Error
+```bash
+# Verify PostgreSQL
+psql -h localhost -U postgres -d swigg_db
+
+# Restart PostgreSQL
+docker restart swigg-postgres
+```
+
+### Port Already in Use
+```bash
+# Change port in application.properties
+server.port=8081
+```
+
+See [SETUP_GUIDE.md](./SETUP_GUIDE.md#troubleshooting) for detailed troubleshooting.
+
+## 📊 Monitoring
+
+- **Health Check**: `GET /swigg/actuator/health`
+- **Metrics**: `GET /swigg/actuator/metrics`
+- **RabbitMQ UI**: http://localhost:15672
+- **Application Logs**: `logs/app.log`
+
+## 🔐 Security
+
+- JWT tokens: 24-hour expiration
+- TOTP window: 5 minutes
+- Password hashing: bcrypt
+- SQL injection prevention: Parameterized queries
+
+## 📝 Environment Variables (Production)
+
+```bash
+# Database
+DB_URL=jdbc:postgresql://postgres:5432/swigg_db
+DB_USER=postgres
+DB_PASSWORD=<secure-password>
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=<secure-password>
+
+# RabbitMQ
+RABBITMQ_HOST=rabbitmq
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=<secure-password>
+
+# JWT
+JWT_SECRET=<secure-secret>
+
+# Twilio (SMS)
+TWILIO_ACCOUNT_SID=<your-sid>
+TWILIO_AUTH_TOKEN=<your-token>
+
+# Google Maps
+GOOGLE_MAPS_API_KEY=<your-key>
+```
+
+## 📌 Version
+
+- **Current**: 1.0.0
+- **Updated**: 2026-06-15
+- **Java**: 21+
+- **Spring Boot**: 3.3.0
 
 ---
 
-## Security & Authentication
+For detailed setup instructions, see [SETUP_GUIDE.md](./SETUP_GUIDE.md)
 
-All API endpoints under `/api/restaurants/**` are secured using Spring Security and JWT. The application enforces Role-Based Access Control (RBAC) with the following roles:
-- **`CUSTOMER`**: Can view/search restaurants.
-- **`RIDER`**: Can view/search restaurants.
-- **`RESTAURANT`**: Full permissions (can view, create, update, and soft-delete restaurants).
-
-### Generating a Demo Token
-To facilitate testing different roles, the open demo token generator endpoint accepts a JSON request body:
-- **URL**: `http://localhost:8080/api/auth/token`
-- **Method**: `POST`
-- **Headers**: `Content-Type: application/json`
-
-**Sample Request (Generating a RIDER role token)**:
-```bash
-curl -X POST http://localhost:8080/api/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "kathir",
-    "role": "RIDER"
-  }'
-```
-
-**Sample Output**:
-```json
-{
-  "tokenType": "Bearer",
-  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJrYXRoaXIiLCJyb2xlIjoiUklERVIiLCJpYXQiOjE3ODE5ODU3ODksImV4cCI6MTc4MjA3MjE4OX0..."
-}
-```
-
-### Using the Token
-For all secured API requests, include the token in the `Authorization` header:
-```http
-Authorization: Bearer <YOUR_GENERATED_TOKEN>
-```
-
----
-
-## API Documentation & Outputs
-
-### Public Health Check
-Retrieves the application running status without requiring authentication.
-- **Method**: `GET`
-- **URL**: `/api/health`
-- **Headers**: *(None)*
-- **Sample Output (200 OK)**:
-```json
-{
-  "status": "UP"
-}
-```
-
-### 1. Get All Active Restaurants
-Retrieves a list of all active restaurants. Available to roles: `CUSTOMER`, `RESTAURANT`, `RIDER`.
-- **Method**: `GET`
-- **URL**: `/api/restaurants`
-- **Headers**:
-  - `Authorization: Bearer <token>`
-- **Sample Output (200 OK)**:
-```json
-[
-  {
-    "restaurantId": "d09436fe-6d04-4df8-8547-8149f7e52a92",
-    "name": "The Spice Route",
-    "rating": 4.85,
-    "ratingCount": 150,
-    "description": "Authentic Indian cuisine with rich flavours and premium ambience.",
-    "country": "India",
-    "state": "Karnataka",
-    "district": "Bangalore",
-    "city": "Bengaluru",
-    "doorNo": "12/A, 100 Feet Road",
-    "mobileNumber": "+919876543210",
-    "openTime": "11:00:00",
-    "closeTime": "23:00:00",
-    "createdAt": "2026-06-13T21:40:00",
-    "updatedAt": "2026-06-13T21:40:00",
-    "imageUrl": "https://example.com/images/spiceroute.jpg",
-    "active": true
-  }
-]
-```
-
-### 2. Get Restaurant by ID
-Retrieves details of a specific restaurant by its UUID. Available to roles: `CUSTOMER`, `RESTAURANT`, `RIDER`.
-- **Method**: `GET`
-- **URL**: `/api/restaurants/{id}`
-- **Headers**:
-  - `Authorization: Bearer <token>`
-- **Sample Output (200 OK)**:
-```json
-{
-  "restaurantId": "d09436fe-6d04-4df8-8547-8149f7e52a92",
-  "name": "The Spice Route",
-  "rating": 4.85,
-  "ratingCount": 150,
-  "description": "Authentic Indian cuisine with rich flavours and premium ambience.",
-  "country": "India",
-  "state": "Karnataka",
-  "district": "Bangalore",
-  "city": "Bengaluru",
-  "doorNo": "12/A, 100 Feet Road",
-  "mobileNumber": "+919876543210",
-  "openTime": "11:00:00",
-  "closeTime": "23:00:00",
-  "createdAt": "2026-06-13T21:40:00",
-  "updatedAt": "2026-06-13T21:40:00",
-  "imageUrl": "https://example.com/images/spiceroute.jpg",
-  "active": true
-}
-```
-
-### 3. Create Restaurant
-Creates a new restaurant. **Restricted to role: `RESTAURANT`**.
-- **Method**: `POST`
-- **URL**: `/api/restaurants`
-- **Headers**:
-  - `Authorization: Bearer <token>`
-  - `Content-Type: application/json`
-- **Sample Request Body**:
-```json
-{
-  "name": "Gourmet Garden",
-  "rating": 4.50,
-  "ratingCount": 80,
-  "description": "Fresh, locally-sourced farm-to-table salads and entrees.",
-  "country": "India",
-  "state": "Tamil Nadu",
-  "district": "Chennai",
-  "city": "Chennai",
-  "doorNo": "45, Gandhi Nagar First Main",
-  "mobileNumber": "+919123456789",
-  "openTime": "09:00:00",
-  "closeTime": "22:00:00",
-  "imageUrl": "https://example.com/images/gourmet.jpg"
-}
-```
-- **Sample Output (217 Created)**:
-```json
-{
-  "restaurantId": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-  "name": "Gourmet Garden",
-  "rating": 4.5,
-  "ratingCount": 80,
-  "description": "Fresh, locally-sourced farm-to-table salads and entrees.",
-  "country": "India",
-  "state": "Tamil Nadu",
-  "district": "Chennai",
-  "city": "Chennai",
-  "doorNo": "45, Gandhi Nagar First Main",
-  "mobileNumber": "+919123456789",
-  "openTime": "09:00:00",
-  "closeTime": "22:00:00",
-  "createdAt": "2026-06-13T21:45:10.123",
-  "updatedAt": "2026-06-13T21:45:10.123",
-  "imageUrl": "https://example.com/images/gourmet.jpg",
-  "active": true
-}
-```
-
-### 4. Update Restaurant
-Updates details of an existing restaurant by UUID. **Restricted to role: `RESTAURANT`**.
-- **Method**: `PUT`
-- **URL**: `/api/restaurants/{id}`
-- **Headers**:
-  - `Authorization: Bearer <token>`
-  - `Content-Type: application/json`
-- **Sample Request Body**:
-```json
-{
-  "name": "Gourmet Garden Cafe",
-  "rating": 4.65,
-  "ratingCount": 92,
-  "description": "Fresh, organic farm-to-table salads, coffees and healthy desserts.",
-  "country": "India",
-  "state": "Tamil Nadu",
-  "district": "Chennai",
-  "city": "Chennai",
-  "doorNo": "45, Gandhi Nagar First Main",
-  "mobileNumber": "+919123456789",
-  "openTime": "08:30:00",
-  "closeTime": "22:30:00",
-  "imageUrl": "https://example.com/images/gourmet-cafe.jpg",
-  "active": true
-}
-```
-- **Sample Output (200 OK)**:
-```json
-{
-  "restaurantId": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-  "name": "Gourmet Garden Cafe",
-  "rating": 4.65,
-  "ratingCount": 92,
-  "description": "Fresh, organic farm-to-table salads, coffees and healthy desserts.",
-  "country": "India",
-  "state": "Tamil Nadu",
-  "district": "Chennai",
-  "city": "Chennai",
-  "doorNo": "45, Gandhi Nagar First Main",
-  "mobileNumber": "+919123456789",
-  "openTime": "08:30:00",
-  "closeTime": "22:30:00",
-  "createdAt": "2026-06-13T21:45:10.123",
-  "updatedAt": "2026-06-13T21:48:05.456",
-  "imageUrl": "https://example.com/images/gourmet-cafe.jpg",
-  "active": true
-}
-```
-
-### 5. Delete Restaurant (Soft Delete)
-Marks the restaurant as inactive (soft delete) instead of dropping the record from the database. **Restricted to role: `RESTAURANT`**.
-- **Method**: `DELETE`
-- **URL**: `/api/restaurants/{id}`
-- **Headers**:
-  - `Authorization: Bearer <token>`
-- **Sample Output (204 No Content)**:
-*(No response body returned)*
-
----
-
-## Global Exception Handling
-
-A centralized exception handler returns consistent, structured JSON responses for errors.
-
-### Error Response Schema
-```json
-{
-  "timestamp": "ISO-8601 formatted timestamp",
-  "status": 500,
-  "error": "HTTP Status Reason Phrase",
-  "message": "Detailed error message explanation",
-  "path": "Requested URI path"
-}
-```
-
-### Sample Exception Outputs
-
-#### A. Resource Not Found (404 Not Found)
-Occurs when requesting, updating, or deleting a UUID that does not exist in the database.
-- **Sample Request**: `GET http://localhost:8080/api/restaurants/00000000-0000-0000-0000-000000000000`
-- **Response**:
-```json
-{
-  "timestamp": "2026-06-13T21:50:12.789",
-  "status": 404,
-  "error": "Not Found",
-  "message": "Restaurant not found with id: 00000000-0000-0000-0000-000000000000",
-  "path": "/api/restaurants/00000000-0000-0000-0000-000000000000"
-}
-```
-
-#### B. Parameter Type Mismatch (400 Bad Request)
-Occurs when providing an invalid UUID format in the path variable.
-- **Sample Request**: `GET http://localhost:8080/api/restaurants/invalid-uuid-string`
-- **Response**:
-```json
-{
-  "timestamp": "2026-06-13T21:52:03.111",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Parameter 'id' should be of type 'UUID'",
-  "path": "/api/restaurants/invalid-uuid-string"
-}
-```
-
-#### C. Unauthorized access (401 Unauthorized)
-Occurs when sending requests without a JWT token or with an invalid/expired token.
-- **Sample Request**: `GET http://localhost:8080/api/restaurants` *(No Auth Header)*
-- **Response**: Standard Spring Security `401 Unauthorized` response.
-
-#### D. Forbidden Access (403 Forbidden)
-Occurs when an authenticated user attempts to access an endpoint for which their role lacks permission (e.g. a `CUSTOMER` trying to create a restaurant).
-- **Sample Request**: `POST http://localhost:8080/api/restaurants` *(With a CUSTOMER token)*
-- **Response**: Standard Spring Security `403 Forbidden` response.
+**Happy Coding! 🎉**

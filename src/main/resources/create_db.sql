@@ -136,3 +136,6 @@ CREATE INDEX idx_riders_geo ON riders(lat, lng);
 
 select * from customers;
 select * from users
+
+
+select * from restaurants;
