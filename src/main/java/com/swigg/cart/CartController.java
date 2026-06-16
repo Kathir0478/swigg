@@ -25,7 +25,7 @@ public class CartController {
 
     @PostMapping("/create")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> createCart(
+    public ResponseEntity<?> createCart(
             @Valid @RequestBody CartRequestDTO request,
             Authentication authentication) {
         try {
@@ -62,7 +62,7 @@ public class CartController {
     @GetMapping("/{cartId}")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Cacheable(value = "carts", key = "'cart_' + #cartId")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> getCart(
+    public ResponseEntity<?> getCart(
             @PathVariable UUID cartId,
             Authentication authentication) {
         try {
@@ -99,7 +99,7 @@ public class CartController {
     @GetMapping("/active")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Cacheable(value = "carts", key = "'customer_active_' + #customerId")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> getActiveCart(
+    public ResponseEntity<?> getActiveCart(
             Authentication authentication) {
         try {
             logger.info("Fetching active cart for customer");
@@ -134,7 +134,7 @@ public class CartController {
 
     @PostMapping("/{cartId}/items/add")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> addItemToCart(
+    public ResponseEntity<?> addItemToCart(
             @PathVariable UUID cartId,
             @Valid @RequestBody AddToCartRequestDTO request,
             Authentication authentication) {
@@ -171,7 +171,7 @@ public class CartController {
 
     @DeleteMapping("/{cartId}/items/{foodId}")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> removeItemFromCart(
+    public ResponseEntity<?> removeItemFromCart(
             @PathVariable UUID cartId,
             @PathVariable UUID foodId,
             @RequestParam(defaultValue = "1") Integer quantity,
@@ -209,7 +209,7 @@ public class CartController {
 
     @PostMapping("/{cartId}/checkout")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> placeOrder(
+    public ResponseEntity<?> placeOrder(
             @PathVariable UUID cartId,
             Authentication authentication) {
         try {
@@ -245,7 +245,7 @@ public class CartController {
 
     @DeleteMapping("/{cartId}")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<Void>> deleteCart(
+    public ResponseEntity<?> deleteCart(
             @PathVariable UUID cartId,
             Authentication authentication) {
         try {
