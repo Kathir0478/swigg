@@ -102,17 +102,17 @@ public class RestaurantController {
         }
     }
 
-    @DeleteMapping("/delete/complete")
+    @PostMapping("/delete/complete")
     @PreAuthorize("hasRole('RESTAURANT')")
     public ResponseEntity<?> deleteComplete(Authentication authentication, @RequestBody RestaurantDeleteVerifyDTO request) {
-        UUID restaurantId = UUID.fromString(authentication.getName());
-        logger.info("Restaurant delete completion request received for restaurantId: {}", restaurantId);
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Restaurant delete completion request received for userId: {}", userId);
         try {
-            restaurantService.completeDelete(restaurantId, request);
-            logger.info("Restaurant deleted successfully for restaurantId: {}", restaurantId);
+            restaurantService.completeDelete(userId, request);
+            logger.info("Restaurant deleted successfully for userId: {}", userId);
             return ResponseEntity.ok(Map.of("message", "Restaurant account deactivated successfully"));
         } catch (IllegalArgumentException e) {
-            logger.warn("Restaurant deletion failed for restaurantId: {}. Reason: {}", restaurantId, e.getMessage());
+            logger.warn("Restaurant deletion failed for userId: {}. Reason: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -120,17 +120,17 @@ public class RestaurantController {
     @PutMapping("/update")
     @PreAuthorize("hasRole('RESTAURANT')")
     public ResponseEntity<?> updateRestaurant(Authentication authentication, @RequestBody RestaurantUpdateRequestDTO request) {
-        UUID restaurantId = UUID.fromString(authentication.getName());
-        logger.info("Restaurant update request received for restaurantId: {}", restaurantId);
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Restaurant update request received for userId: {}", userId);
         try {
-            Restaurant updatedRestaurant = restaurantService.updateRestaurant(restaurantId, request);
-            logger.info("Restaurant updated successfully for restaurantId: {}", restaurantId);
+            Restaurant updatedRestaurant = restaurantService.updateRestaurant(userId, request);
+            logger.info("Restaurant updated successfully for userId: {}", userId);
             return ResponseEntity.ok(Map.of(
                     "message", "Restaurant updated successfully",
                     "restaurantId", updatedRestaurant.getRestaurantId()
             ));
         } catch (IllegalArgumentException e) {
-            logger.warn("Restaurant update failed for restaurantId: {}. Reason: {}", restaurantId, e.getMessage());
+            logger.warn("Restaurant update failed for userId: {}. Reason: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

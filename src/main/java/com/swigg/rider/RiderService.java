@@ -279,17 +279,17 @@ public class RiderService {
     }
 
     @Transactional
-    public Rider updateRider(UUID riderId, RiderUpdateRequestDTO request) {
-        logger.info("Rider update requested for riderId: {}", riderId);
+    public Rider updateRider(UUID userId, RiderUpdateRequestDTO request) {
+        logger.info("Rider update requested for userId: {}", userId);
 
-        Rider rider = riderRepository.findByUserId(riderId)
+        Rider rider = riderRepository.findByUserId(userId)
                 .orElseThrow(() -> {
-                    logger.warn("Rider update failed: rider '{}' not found", riderId);
+                    logger.warn("Rider update failed: rider not found for userId: {}", userId);
                     return new IllegalArgumentException("Rider not found");
                 });
 
         if (!Boolean.TRUE.equals(rider.getIsActive())) {
-            logger.warn("Rider update failed: rider '{}' is deactivated", riderId);
+            logger.warn("Rider update failed: rider is deactivated for userId: {}", userId);
             throw new IllegalArgumentException("Account is deactivated");
         }
 
@@ -324,9 +324,9 @@ public class RiderService {
         Rider updatedRider = riderRepository.save(rider);
         evictRiderCache(updatedRider.getRiderId());
         if (coordinatesChanged) {
-            asyncGeocodingService.scheduleAddressUpdate(rider.getLat(), rider.getLng(), riderId, "RIDER");
+            asyncGeocodingService.scheduleAddressUpdate(rider.getLat(), rider.getLng(), userId, "RIDER");
         }
-        logger.info("Rider updated successfully for riderId: {}", riderId);
+        logger.info("Rider updated successfully for userId: {}", userId);
         return updatedRider;
     }
 

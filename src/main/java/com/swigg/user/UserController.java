@@ -94,7 +94,7 @@ public class UserController {
         }
     }
 
-    @DeleteMapping("/delete/complete")
+    @PostMapping("/delete/complete")
     public ResponseEntity<?> deleteAccount(Authentication authentication,
                                            @RequestBody DeleteUserRequestDTO request) {
         UUID userId = UUID.fromString(authentication.getName());

@@ -1,6 +1,7 @@
 package com.swigg.rider;
 
 import com.swigg.auth.TokenResponseDTO;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ public class RiderController {
 
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> registerRequest(Authentication authentication, @RequestBody RiderRegisterRequestDTO request) {
+    public ResponseEntity<?> registerRequest(Authentication authentication, @Valid @RequestBody RiderRegisterRequestDTO request) {
         UUID userId = UUID.fromString(authentication.getName());
         logger.info("Rider registration request received for userId: {}", userId);
         try {
@@ -102,17 +103,17 @@ public class RiderController {
         }
     }
 
-    @DeleteMapping("/delete/complete")
+    @PostMapping("/delete/complete")
     @PreAuthorize("hasRole('RIDER')")
     public ResponseEntity<?> deleteComplete(Authentication authentication, @RequestBody RiderDeleteVerifyDTO request) {
-        UUID riderId = UUID.fromString(authentication.getName());
-        logger.info("Rider delete completion request received for riderId: {}", riderId);
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Rider delete completion request received for userId: {}", userId);
         try {
-            riderService.completeDelete(riderId, request);
-            logger.info("Rider deleted successfully for riderId: {}", riderId);
+            riderService.completeDelete(userId, request);
+            logger.info("Rider deleted successfully for userId: {}", userId);
             return ResponseEntity.ok(Map.of("message", "Rider account deactivated successfully"));
         } catch (IllegalArgumentException e) {
-            logger.warn("Rider deletion failed for riderId: {}. Reason: {}", riderId, e.getMessage());
+            logger.warn("Rider deletion failed for userId: {}. Reason: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -120,17 +121,17 @@ public class RiderController {
     @PutMapping("/update")
     @PreAuthorize("hasRole('RIDER')")
     public ResponseEntity<?> updateRider(Authentication authentication, @RequestBody RiderUpdateRequestDTO request) {
-        UUID riderId = UUID.fromString(authentication.getName());
-        logger.info("Rider update request received for riderId: {}", riderId);
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Rider update request received for userId: {}", userId);
         try {
-            Rider updatedRider = riderService.updateRider(riderId, request);
-            logger.info("Rider updated successfully for riderId: {}", riderId);
+            Rider updatedRider = riderService.updateRider(userId, request);
+            logger.info("Rider updated successfully for userId: {}", userId);
             return ResponseEntity.ok(Map.of(
                     "message", "Rider updated successfully",
                     "riderId", updatedRider.getRiderId()
             ));
         } catch (IllegalArgumentException e) {
-            logger.warn("Rider update failed for riderId: {}. Reason: {}", riderId, e.getMessage());
+            logger.warn("Rider update failed for userId: {}. Reason: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

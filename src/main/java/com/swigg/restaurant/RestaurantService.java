@@ -281,17 +281,17 @@ public class RestaurantService {
     }
 
     @Transactional
-    public Restaurant updateRestaurant(UUID restaurantId, RestaurantUpdateRequestDTO request) {
-        logger.info("Restaurant update requested for restaurantId: {}", restaurantId);
+    public Restaurant updateRestaurant(UUID userId, RestaurantUpdateRequestDTO request) {
+        logger.info("Restaurant update requested for userId: {}", userId);
 
-        Restaurant restaurant = restaurantRepository.findByUserId(restaurantId)
+        Restaurant restaurant = restaurantRepository.findByUserId(userId)
                 .orElseThrow(() -> {
-                    logger.warn("Restaurant update failed: restaurant '{}' not found", restaurantId);
+                    logger.warn("Restaurant update failed: restaurant not found for userId: {}", userId);
                     return new IllegalArgumentException("Restaurant not found");
                 });
 
         if (!Boolean.TRUE.equals(restaurant.getIsActive())) {
-            logger.warn("Restaurant update failed: restaurant '{}' is deactivated", restaurantId);
+            logger.warn("Restaurant update failed: restaurant is deactivated for userId: {}", userId);
             throw new IllegalArgumentException("Account is deactivated");
         }
 
@@ -323,9 +323,9 @@ public class RestaurantService {
         Restaurant updatedRestaurant = restaurantRepository.save(restaurant);
         evictRestaurantCache(updatedRestaurant.getRestaurantId());
         if (coordinatesChanged) {
-            asyncGeocodingService.scheduleAddressUpdate(restaurant.getLat(), restaurant.getLng(), restaurantId, "RESTAURANT");
+            asyncGeocodingService.scheduleAddressUpdate(restaurant.getLat(), restaurant.getLng(), userId, "RESTAURANT");
         }
-        logger.info("Restaurant updated successfully for restaurantId: {}", restaurantId);
+        logger.info("Restaurant updated successfully for userId: {}", userId);
         return updatedRestaurant;
     }
 

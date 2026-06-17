@@ -25,13 +25,13 @@ public class CartController {
 
     @PostMapping("/create")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<?> createCart(
+    public ResponseEntity<ApiResponse<CartResponseDTO>> createCart(
             @Valid @RequestBody CartRequestDTO request,
             Authentication authentication) {
         try {
             logger.info("Cart creation request received");
-            UUID customerId = UUID.fromString(authentication.getName());
-            CartResponseDTO cart = cartService.createCart(customerId, request);
+            UUID userId = UUID.fromString(authentication.getName());
+            CartResponseDTO cart = cartService.createCart(userId, request);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<CartResponseDTO>builder()
@@ -62,13 +62,13 @@ public class CartController {
     @GetMapping("/{cartId}")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Cacheable(value = "carts", key = "'cart_' + #cartId")
-    public ResponseEntity<?> getCart(
+    public ResponseEntity<ApiResponse<CartResponseDTO>> getCart(
             @PathVariable UUID cartId,
             Authentication authentication) {
         try {
             logger.info("Fetching cart: {}", cartId);
-            UUID customerId = UUID.fromString(authentication.getName());
-            CartResponseDTO cart = cartService.getCartById(customerId, cartId);
+            UUID userId = UUID.fromString(authentication.getName());
+            CartResponseDTO cart = cartService.getCartById(userId, cartId);
 
             return ResponseEntity.ok(
                     ApiResponse.<CartResponseDTO>builder()
@@ -98,13 +98,13 @@ public class CartController {
 
     @GetMapping("/active")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Cacheable(value = "carts", key = "'customer_active_' + #customerId")
-    public ResponseEntity<?> getActiveCart(
+    @Cacheable(value = "carts", key = "'customer_active_' + #userId")
+    public ResponseEntity<ApiResponse<CartResponseDTO>> getActiveCart(
             Authentication authentication) {
         try {
             logger.info("Fetching active cart for customer");
-            UUID customerId = UUID.fromString(authentication.getName());
-            CartResponseDTO cart = cartService.getActiveCartByCustomer(customerId);
+            UUID userId = UUID.fromString(authentication.getName());
+            CartResponseDTO cart = cartService.getActiveCartByCustomer(userId);
 
             return ResponseEntity.ok(
                     ApiResponse.<CartResponseDTO>builder()
@@ -134,14 +134,14 @@ public class CartController {
 
     @PostMapping("/{cartId}/items/add")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<?> addItemToCart(
+    public ResponseEntity<ApiResponse<CartResponseDTO>> addItemToCart(
             @PathVariable UUID cartId,
             @Valid @RequestBody AddToCartRequestDTO request,
             Authentication authentication) {
         try {
             logger.info("Adding item to cart: {}", cartId);
-            UUID customerId = UUID.fromString(authentication.getName());
-            CartResponseDTO cart = cartService.addItemToCart(customerId, cartId, request);
+            UUID userId = UUID.fromString(authentication.getName());
+            CartResponseDTO cart = cartService.addItemToCart(userId, cartId, request);
 
             return ResponseEntity.ok(
                     ApiResponse.<CartResponseDTO>builder()
@@ -171,15 +171,15 @@ public class CartController {
 
     @DeleteMapping("/{cartId}/items/{foodId}")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<?> removeItemFromCart(
+    public ResponseEntity<ApiResponse<CartResponseDTO>> removeItemFromCart(
             @PathVariable UUID cartId,
             @PathVariable UUID foodId,
             @RequestParam(defaultValue = "1") Integer quantity,
             Authentication authentication) {
         try {
             logger.info("Removing item from cart: {}", cartId);
-            UUID customerId = UUID.fromString(authentication.getName());
-            CartResponseDTO cart = cartService.removeItemFromCart(customerId, cartId, foodId, quantity);
+            UUID userId = UUID.fromString(authentication.getName());
+            CartResponseDTO cart = cartService.removeItemFromCart(userId, cartId, foodId, quantity);
 
             return ResponseEntity.ok(
                     ApiResponse.<CartResponseDTO>builder()
@@ -209,13 +209,13 @@ public class CartController {
 
     @PostMapping("/{cartId}/checkout")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<?> placeOrder(
+    public ResponseEntity<ApiResponse<CartResponseDTO>> placeOrder(
             @PathVariable UUID cartId,
             Authentication authentication) {
         try {
             logger.info("Placing order for cart: {}", cartId);
-            UUID customerId = UUID.fromString(authentication.getName());
-            CartResponseDTO cart = cartService.placeOrder(customerId, cartId);
+            UUID userId = UUID.fromString(authentication.getName());
+            CartResponseDTO cart = cartService.placeOrder(userId, cartId);
 
             return ResponseEntity.ok(
                     ApiResponse.<CartResponseDTO>builder()
@@ -245,13 +245,13 @@ public class CartController {
 
     @DeleteMapping("/{cartId}")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<?> deleteCart(
+    public ResponseEntity<ApiResponse<Void>> deleteCart(
             @PathVariable UUID cartId,
             Authentication authentication) {
         try {
             logger.info("Deleting cart: {}", cartId);
-            UUID customerId = UUID.fromString(authentication.getName());
-            cartService.deleteCart(customerId, cartId);
+            UUID userId = UUID.fromString(authentication.getName());
+            cartService.deleteCart(userId, cartId);
 
             return ResponseEntity.ok(
                     ApiResponse.<Void>builder()

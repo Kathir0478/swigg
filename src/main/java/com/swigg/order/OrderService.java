@@ -51,17 +51,19 @@ public class OrderService {
 
     @Transactional
     @CacheEvict(value = "orders", allEntries = true)
-    public OrderResponseDTO createOrder(UUID customerId, CreateOrderRequestDTO request) {
-        logger.info("Creating order for customer: {} with cart: {}", customerId, request.getCartId());
+    public OrderResponseDTO createOrder(UUID userId, CreateOrderRequestDTO request) {
+        logger.info("Creating order for userId: {} with cart: {}", userId, request.getCartId());
 
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository.findByUserId(userId)
                 .orElseThrow(() -> {
-                    logger.warn("Customer not found: {}", customerId);
+                    logger.warn("Customer not found for userId: {}", userId);
                     return new IllegalArgumentException("Customer not found");
                 });
 
+        UUID customerId = customer.getCustomerId();
+
         if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            logger.warn("Customer account deactivated: {}", customerId);
+            logger.warn("Customer account deactivated for userId: {}", userId);
             throw new IllegalArgumentException("Customer account is deactivated");
         }
 
@@ -72,7 +74,7 @@ public class OrderService {
                 });
 
         if (!cart.getCustomerId().equals(customerId)) {
-            logger.warn("Cart does not belong to customer: {} for cart: {}", customerId, request.getCartId());
+            logger.warn("Cart does not belong to customer for userId: {} and cart: {}", userId, request.getCartId());
             throw new IllegalArgumentException("Cart does not belong to this customer");
         }
 
@@ -117,19 +119,27 @@ public class OrderService {
                 .build();
 
         Order savedOrder = orderRepository.save(order);
-        logger.info("Order created successfully: {} for customer: {}", savedOrder.getOrderId(), customerId);
+        logger.info("Order created successfully: {} for userId: {}", savedOrder.getOrderId(), userId);
 
         return mapToResponseDTO(savedOrder);
     }
 
     @Transactional
     @CacheEvict(value = "orders", allEntries = true)
-    public OrderResponseDTO updateOrder(UUID customerId, UUID orderId, UpdateOrderRequestDTO request) {
-        logger.info("Updating order: {} for customer: {}", orderId, customerId);
+    public OrderResponseDTO updateOrder(UUID userId, UUID orderId, UpdateOrderRequestDTO request) {
+        logger.info("Updating order: {} for userId: {}", orderId, userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Order order = orderRepository.findByOrderIdAndCustomerId(orderId, customerId)
                 .orElseThrow(() -> {
-                    logger.warn("Order not found: {} for customer: {}", orderId, customerId);
+                    logger.warn("Order not found: {} for userId: {}", orderId, userId);
                     return new IllegalArgumentException("Order not found or does not belong to this customer");
                 });
 
@@ -166,36 +176,60 @@ public class OrderService {
         return mapToResponseDTO(order);
     }
 
-    @Cacheable(value = "orders", key = "'customer_orders_' + #customerId")
-    public List<OrderResponseDTO> getOrdersByCustomer(UUID customerId) {
-        logger.info("Fetching orders for customer: {}", customerId);
+    @Cacheable(value = "orders", key = "'customer_orders_' + #userId")
+    public List<OrderResponseDTO> getOrdersByCustomer(UUID userId) {
+        logger.info("Fetching orders for userId: {}", userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         List<Order> orders = orderRepository.findByCustomerIdAndIsActive(customerId, true);
-        logger.info("Found {} orders for customer: {}", orders.size(), customerId);
+        logger.info("Found {} orders for userId: {}", orders.size(), userId);
 
         return orders.stream()
                 .map(this::mapToResponseDTO)
                 .toList();
     }
 
-    @Cacheable(value = "orders", key = "'rider_orders_' + #riderId")
-    public List<OrderResponseDTO> getOrdersByRider(UUID riderId) {
-        logger.info("Fetching orders for rider: {}", riderId);
+    @Cacheable(value = "orders", key = "'rider_orders_' + #userId")
+    public List<OrderResponseDTO> getOrdersByRider(UUID userId) {
+        logger.info("Fetching orders for userId: {}", userId);
+
+        Rider rider = riderRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Rider not found for userId: {}", userId);
+                    return new IllegalArgumentException("Rider not found");
+                });
+
+        UUID riderId = rider.getRiderId();
 
         List<Order> orders = orderRepository.findByRiderIdAndIsActive(riderId, true);
-        logger.info("Found {} orders for rider: {}", orders.size(), riderId);
+        logger.info("Found {} orders for userId: {}", orders.size(), userId);
 
         return orders.stream()
                 .map(this::mapToResponseDTO)
                 .toList();
     }
 
-    @Cacheable(value = "orders", key = "'restaurant_orders_' + #restaurantId")
-    public List<OrderResponseDTO> getOrdersByRestaurant(UUID restaurantId) {
-        logger.info("Fetching orders for restaurant: {}", restaurantId);
+    @Cacheable(value = "orders", key = "'restaurant_orders_' + #userId")
+    public List<OrderResponseDTO> getOrdersByRestaurant(UUID userId) {
+        logger.info("Fetching orders for userId: {}", userId);
+
+        Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Restaurant not found for userId: {}", userId);
+                    return new IllegalArgumentException("Restaurant not found");
+                });
+
+        UUID restaurantId = restaurant.getRestaurantId();
 
         List<Order> orders = orderRepository.findByRestaurantIdAndIsActive(restaurantId, true);
-        logger.info("Found {} orders for restaurant: {}", orders.size(), restaurantId);
+        logger.info("Found {} orders for userId: {}", orders.size(), userId);
 
         return orders.stream()
                 .map(this::mapToResponseDTO)
