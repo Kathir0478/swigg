@@ -31,8 +31,8 @@ public class OrderController {
             Authentication authentication) {
         try {
             logger.info("Order creation request received");
-            UUID customerId = UUID.fromString(authentication.getName());
-            OrderResponseDTO order = orderService.createOrder(customerId, request);
+            UUID userId = UUID.fromString(authentication.getName());
+            OrderResponseDTO order = orderService.createOrder(userId, request);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<OrderResponseDTO>builder()
@@ -68,8 +68,8 @@ public class OrderController {
             Authentication authentication) {
         try {
             logger.info("Order update request received for order: {}", orderId);
-            UUID customerId = UUID.fromString(authentication.getName());
-            OrderResponseDTO order = orderService.updateOrder(customerId, orderId, request);
+            UUID userId = UUID.fromString(authentication.getName());
+            OrderResponseDTO order = orderService.updateOrder(userId, orderId, request);
 
             return ResponseEntity.ok(
                     ApiResponse.<OrderResponseDTO>builder()
@@ -134,12 +134,12 @@ public class OrderController {
 
     @GetMapping("/customer")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Cacheable(value = "orders", key = "'customer_orders_' + #customerId")
+    @Cacheable(value = "orders", key = "'customer_orders_' + #userId")
     public ResponseEntity<?> getOrdersByCustomer(Authentication authentication) {
         try {
             logger.info("Fetching orders for customer");
-            UUID customerId = UUID.fromString(authentication.getName());
-            List<OrderResponseDTO> orders = orderService.getOrdersByCustomer(customerId);
+            UUID userId = UUID.fromString(authentication.getName());
+            List<OrderResponseDTO> orders = orderService.getOrdersByCustomer(userId);
 
             return ResponseEntity.ok(
                     ApiResponse.<List<OrderResponseDTO>>builder()
@@ -170,12 +170,12 @@ public class OrderController {
 
     @GetMapping("/rider")
     @PreAuthorize("hasRole('RIDER')")
-    @Cacheable(value = "orders", key = "'rider_orders_' + #riderId")
+    @Cacheable(value = "orders", key = "'rider_orders_' + #userId")
     public ResponseEntity<?> getOrdersByRider(Authentication authentication) {
         try {
             logger.info("Fetching orders for rider");
-            UUID riderId = UUID.fromString(authentication.getName());
-            List<OrderResponseDTO> orders = orderService.getOrdersByRider(riderId);
+            UUID userId = UUID.fromString(authentication.getName());
+            List<OrderResponseDTO> orders = orderService.getOrdersByRider(userId);
 
             return ResponseEntity.ok(
                     ApiResponse.<List<OrderResponseDTO>>builder()
@@ -206,12 +206,12 @@ public class OrderController {
 
     @GetMapping("/restaurant")
     @PreAuthorize("hasRole('RESTAURANT')")
-    @Cacheable(value = "orders", key = "'restaurant_orders_' + #restaurantId")
+    @Cacheable(value = "orders", key = "'restaurant_orders_' + #userId")
     public ResponseEntity<?> getOrdersByRestaurant(Authentication authentication) {
         try {
             logger.info("Fetching orders for restaurant");
-            UUID restaurantId = UUID.fromString(authentication.getName());
-            List<OrderResponseDTO> orders = orderService.getOrdersByRestaurant(restaurantId);
+            UUID userId = UUID.fromString(authentication.getName());
+            List<OrderResponseDTO> orders = orderService.getOrdersByRestaurant(userId);
 
             return ResponseEntity.ok(
                     ApiResponse.<List<OrderResponseDTO>>builder()

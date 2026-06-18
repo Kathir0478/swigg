@@ -38,7 +38,6 @@ public class UserService {
     @Autowired
     private com.swigg.auth.AsyncOtpService asyncOtpService;
 
-    @Transactional
     public SignupInitResponseDTO initSignup(SignupRequestDTO request) {
         String username = request.getUsername();
         String phoneNumber = request.getPhoneNumber();
@@ -58,11 +57,28 @@ public class UserService {
             logger.warn("Signup failed for username '{}': password is required", username);
             throw new IllegalArgumentException("Password is required");
         }
+
+        UUID userId = createOrGetUser(username, phoneNumber, password);
+
+        asyncOtpService.generateAndSendOtpAsync(userId.toString(), phoneNumber, "SIGNUP");
+        logger.info("Signup OTP send initiated asynchronously for username: {}", username);
+
+        String maskedPhone = OtpService.maskPhoneNumber(phoneNumber);
+        logger.info("Signup verification code generation initiated for username: {}. Awaiting verification.", username);
+
+        return new SignupInitResponseDTO(
+                username,
+                "Verification code sent to your mobile number",
+                maskedPhone
+        );
+    }
+
+    @Transactional
+    public UUID createOrGetUser(String username, String phoneNumber, String password) {
         User existingUser = userRepository.findByPhoneNumber(phoneNumber).orElse(null);
-        String totpSecret;
         UUID userId;
-        if (existingUser==null){
-            totpSecret = totpService.generateSecret();
+        if (existingUser == null) {
+            String totpSecret = totpService.generateSecret();
             String passwordHash = passwordEncoder.encode(password);
             User user = User.builder()
                     .userName(username)
@@ -77,23 +93,10 @@ public class UserService {
             User savedUser = userRepository.save(user);
             userId = savedUser.getUserId();
             logger.info("User created in database for username: {} with isVerified=false", username);
-        }
-        else {
-            totpSecret=existingUser.getTotpSecret();
+        } else {
             userId = existingUser.getUserId();
         }
-
-        asyncOtpService.generateAndSendOtpAsync(userId.toString(), phoneNumber, "SIGNUP");
-        logger.info("Signup OTP send initiated asynchronously for username: {}", username);
-
-        String maskedPhone = OtpService.maskPhoneNumber(phoneNumber);
-        logger.info("Signup verification code generation initiated for username: {}. Awaiting verification.", username);
-
-        return new SignupInitResponseDTO(
-                username,
-                "Verification code sent to your mobile number",
-                maskedPhone
-        );
+        return userId;
     }
 
     @Transactional

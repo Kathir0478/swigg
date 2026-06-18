@@ -102,17 +102,17 @@ public class CustomerController {
         }
     }
 
-    @DeleteMapping("/delete/complete")
+    @PostMapping("/delete/complete")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<?> deleteComplete(Authentication authentication, @RequestBody CustomerDeleteVerifyDTO request) {
-        UUID customerId = UUID.fromString(authentication.getName());
-        logger.info("Customer delete completion request received for customerId: {}", customerId);
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Customer delete completion request received for userId: {}", userId);
         try {
-            customerService.completeDelete(customerId, request);
-            logger.info("Customer deleted successfully for customerId: {}", customerId);
+            customerService.completeDelete(userId, request);
+            logger.info("Customer deleted successfully for userId: {}", userId);
             return ResponseEntity.ok(Map.of("message", "Customer account deactivated successfully"));
         } catch (IllegalArgumentException e) {
-            logger.warn("Customer deletion failed for customerId: {}. Reason: {}", customerId, e.getMessage());
+            logger.warn("Customer deletion failed for userId: {}. Reason: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -120,17 +120,17 @@ public class CustomerController {
     @PutMapping("/update")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<?> updateCustomer(Authentication authentication, @RequestBody CustomerUpdateRequestDTO request) {
-        UUID customerId = UUID.fromString(authentication.getName());
-        logger.info("Customer update request received for customerId: {}", customerId);
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Customer update request received for userId: {}", userId);
         try {
-            Customer updatedCustomer = customerService.updateCustomer(customerId, request);
-            logger.info("Customer updated successfully for customerId: {}", customerId);
+            Customer updatedCustomer = customerService.updateCustomer(userId, request);
+            logger.info("Customer updated successfully for userId: {}", userId);
             return ResponseEntity.ok(Map.of(
                     "message", "Customer updated successfully",
                     "customerId", updatedCustomer.getCustomerId()
             ));
         } catch (IllegalArgumentException e) {
-            logger.warn("Customer update failed for customerId: {}. Reason: {}", customerId, e.getMessage());
+            logger.warn("Customer update failed for userId: {}. Reason: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

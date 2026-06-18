@@ -272,17 +272,17 @@ public class CustomerService {
     }
 
     @Transactional
-    public Customer updateCustomer(UUID customerId, CustomerUpdateRequestDTO request) {
-        logger.info("Customer update requested for customerId: {}", customerId);
+    public Customer updateCustomer(UUID userId, CustomerUpdateRequestDTO request) {
+        logger.info("Customer update requested for userId: {}", userId);
 
-        Customer customer = customerRepository.findByUserId(customerId)
+        Customer customer = customerRepository.findByUserId(userId)
                 .orElseThrow(() -> {
-                    logger.warn("Customer update failed: customer '{}' not found", customerId);
+                    logger.warn("Customer update failed: customer not found for userId: {}", userId);
                     return new IllegalArgumentException("Customer not found");
                 });
 
         if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            logger.warn("Customer update failed: customer '{}' is deactivated", customerId);
+            logger.warn("Customer update failed: customer is deactivated for userId: {}", userId);
             throw new IllegalArgumentException("Account is deactivated");
         }
 
@@ -311,9 +311,9 @@ public class CustomerService {
         Customer updatedCustomer = customerRepository.save(customer);
         evictCustomerCache(updatedCustomer.getCustomerId());
         if (coordinatesChanged) {
-            asyncGeocodingService.scheduleAddressUpdate(customer.getLat(), customer.getLng(), customerId, "CUSTOMER");
+            asyncGeocodingService.scheduleAddressUpdate(customer.getLat(), customer.getLng(), userId, "CUSTOMER");
         }
-        logger.info("Customer updated successfully for customerId: {}", customerId);
+        logger.info("Customer updated successfully for userId: {}", userId);
         return updatedCustomer;
     }
 

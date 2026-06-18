@@ -30,7 +30,7 @@ public class AsyncOtpService {
         try {
             logger.info("Generating OTP asynchronously for userId: {} with type: {}", userId, type);
 
-            User user = userRepository.findById(UUID.fromString(userId))
+            User user = userRepository.findByUserId(UUID.fromString(userId))
                     .orElseThrow(() -> new IllegalArgumentException("User not found for ID: " + userId));
             String secret = user.getTotpSecret();
             if (secret == null || secret.isBlank()) {

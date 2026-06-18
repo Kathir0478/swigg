@@ -42,17 +42,19 @@ public class CartService {
 
     @Transactional
     @CacheEvict(value = "carts", allEntries = true)
-    public CartResponseDTO createCart(UUID customerId, CartRequestDTO request) {
-        logger.info("Creating cart for customer: {} in restaurant: {}", customerId, request.getRestaurantId());
+    public CartResponseDTO createCart(UUID userId, CartRequestDTO request) {
+        logger.info("Creating cart for userId: {} in restaurant: {}", userId, request.getRestaurantId());
 
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository.findByUserId(userId)
                 .orElseThrow(() -> {
-                    logger.warn("Customer not found: {}", customerId);
+                    logger.warn("Customer not found for userId: {}", userId);
                     return new IllegalArgumentException("Customer not found");
                 });
 
+        UUID customerId = customer.getCustomerId();
+
         if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            logger.warn("Customer account deactivated: {}", customerId);
+            logger.warn("Customer account deactivated for userId: {}", userId);
             throw new IllegalArgumentException("Customer account is deactivated");
         }
 
@@ -69,7 +71,7 @@ public class CartService {
 
         cartRepository.findActiveCartByCustomerAndRestaurant(customerId, request.getRestaurantId())
                 .ifPresent(existingCart -> {
-                    logger.warn("Active cart already exists for customer: {} in restaurant: {}", customerId, request.getRestaurantId());
+                    logger.warn("Active cart already exists for userId: {} in restaurant: {}", userId, request.getRestaurantId());
                     throw new IllegalArgumentException("Active cart already exists for this restaurant");
                 });
 
@@ -85,19 +87,27 @@ public class CartService {
                 .build();
 
         Cart savedCart = cartRepository.save(cart);
-        logger.info("Cart created successfully: {} for customer: {}", savedCart.getCartId(), customerId);
+        logger.info("Cart created successfully: {} for userId: {}", savedCart.getCartId(), userId);
 
         return mapToResponseDTO(savedCart);
     }
 
     @Transactional
     @CacheEvict(value = "carts", allEntries = true)
-    public CartResponseDTO addItemToCart(UUID customerId, UUID cartId, AddToCartRequestDTO request) {
-        logger.info("Adding item to cart: {} for customer: {}", cartId, customerId);
+    public CartResponseDTO addItemToCart(UUID userId, UUID cartId, AddToCartRequestDTO request) {
+        logger.info("Adding item to cart: {} for userId: {}", cartId, userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Cart cart = cartRepository.findByCartIdAndCustomerId(cartId, customerId)
                 .orElseThrow(() -> {
-                    logger.warn("Cart not found: {} for customer: {}", cartId, customerId);
+                    logger.warn("Cart not found: {} for userId: {}", cartId, userId);
                     return new IllegalArgumentException("Cart not found or does not belong to this customer");
                 });
 
@@ -140,12 +150,20 @@ public class CartService {
 
     @Transactional
     @CacheEvict(value = "carts", allEntries = true)
-    public CartResponseDTO removeItemFromCart(UUID customerId, UUID cartId, UUID foodId, Integer quantity) {
-        logger.info("Removing item from cart: {} for customer: {}", cartId, customerId);
+    public CartResponseDTO removeItemFromCart(UUID userId, UUID cartId, UUID foodId, Integer quantity) {
+        logger.info("Removing item from cart: {} for userId: {}", cartId, userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Cart cart = cartRepository.findByCartIdAndCustomerId(cartId, customerId)
                 .orElseThrow(() -> {
-                    logger.warn("Cart not found: {} for customer: {}", cartId, customerId);
+                    logger.warn("Cart not found: {} for userId: {}", cartId, userId);
                     return new IllegalArgumentException("Cart not found or does not belong to this customer");
                 });
 
@@ -180,12 +198,20 @@ public class CartService {
 
     @Transactional
     @CacheEvict(value = "carts", allEntries = true)
-    public CartResponseDTO placeOrder(UUID customerId, UUID cartId) {
-        logger.info("Placing order for cart: {} by customer: {}", cartId, customerId);
+    public CartResponseDTO placeOrder(UUID userId, UUID cartId) {
+        logger.info("Placing order for cart: {} by userId: {}", cartId, userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Cart cart = cartRepository.findByCartIdAndCustomerId(cartId, customerId)
                 .orElseThrow(() -> {
-                    logger.warn("Cart not found: {} for customer: {}", cartId, customerId);
+                    logger.warn("Cart not found: {} for userId: {}", cartId, userId);
                     return new IllegalArgumentException("Cart not found or does not belong to this customer");
                 });
 
@@ -208,12 +234,20 @@ public class CartService {
 
     @Transactional
     @CacheEvict(value = "carts", allEntries = true)
-    public void deleteCart(UUID customerId, UUID cartId) {
-        logger.info("Deleting cart: {} for customer: {}", cartId, customerId);
+    public void deleteCart(UUID userId, UUID cartId) {
+        logger.info("Deleting cart: {} for userId: {}", cartId, userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Cart cart = cartRepository.findByCartIdAndCustomerId(cartId, customerId)
                 .orElseThrow(() -> {
-                    logger.warn("Cart not found: {} for customer: {}", cartId, customerId);
+                    logger.warn("Cart not found: {} for userId: {}", cartId, userId);
                     return new IllegalArgumentException("Cart not found or does not belong to this customer");
                 });
 
@@ -223,12 +257,20 @@ public class CartService {
     }
 
     @Cacheable(value = "carts", key = "'cart_' + #cartId")
-    public CartResponseDTO getCartById(UUID customerId, UUID cartId) {
-        logger.info("Fetching cart: {} for customer: {}", cartId, customerId);
+    public CartResponseDTO getCartById(UUID userId, UUID cartId) {
+        logger.info("Fetching cart: {} for userId: {}", cartId, userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Cart cart = cartRepository.findByCartIdAndCustomerId(cartId, customerId)
                 .orElseThrow(() -> {
-                    logger.warn("Cart not found: {} for customer: {}", cartId, customerId);
+                    logger.warn("Cart not found: {} for userId: {}", cartId, userId);
                     return new IllegalArgumentException("Cart not found");
                 });
 
@@ -241,17 +283,25 @@ public class CartService {
         return mapToResponseDTO(cart);
     }
 
-    @Cacheable(value = "carts", key = "'customer_active_' + #customerId")
-    public CartResponseDTO getActiveCartByCustomer(UUID customerId) {
-        logger.info("Fetching active cart for customer: {}", customerId);
+    @Cacheable(value = "carts", key = "'customer_active_' + #userId")
+    public CartResponseDTO getActiveCartByCustomer(UUID userId) {
+        logger.info("Fetching active cart for userId: {}", userId);
+
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        UUID customerId = customer.getCustomerId();
 
         Cart cart = cartRepository.findByCustomerIdAndStatusAndIsActive(customerId, CartStatus.ACTIVE, true)
                 .orElseThrow(() -> {
-                    logger.warn("No active cart found for customer: {}", customerId);
+                    logger.warn("No active cart found for userId: {}", userId);
                     return new IllegalArgumentException("No active cart found");
                 });
 
-        logger.info("Successfully fetched active cart for customer: {}", customerId);
+        logger.info("Successfully fetched active cart for userId: {}", userId);
         return mapToResponseDTO(cart);
     }
 

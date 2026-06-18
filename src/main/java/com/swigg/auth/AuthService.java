@@ -1,8 +1,15 @@
 package com.swigg.auth;
 
+import com.swigg.customer.Customer;
+import com.swigg.customer.CustomerRepository;
 import com.swigg.messaging.OtpPurpose;
 import com.swigg.messaging.OtpSentResponseDTO;
 import com.swigg.messaging.OtpService;
+import com.swigg.restaurant.Restaurant;
+import com.swigg.restaurant.RestaurantRepository;
+import com.swigg.rider.Rider;
+import com.swigg.rider.RiderRepository;
+import com.swigg.user.Role;
 import com.swigg.user.User;
 import com.swigg.user.UserRepository;
 import org.slf4j.Logger;
@@ -11,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -29,6 +38,15 @@ public class AuthService {
 
     @Autowired
     private OtpService otpService;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private RestaurantRepository restaurantRepository;
+
+    @Autowired
+    private RiderRepository riderRepository;
 
     public OtpSentResponseDTO initiateLogin(TokenRequestDTO data) {
         String username = data.getUsername();
@@ -123,5 +141,74 @@ public class AuthService {
 
         logger.info("Refresh token valid for userId: {}. Issuing new tokens.", userId);
         return generateTokensForUser(user);
+    }
+
+    public UserProfileResponseDTO getUserProfile(UUID userId, String token) {
+        logger.info("Fetching user profile for userId: {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    logger.warn("User profile fetch failed: user '{}' not found", userId);
+                    return new IllegalArgumentException("User not found");
+                });
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            logger.warn("User profile fetch failed: account deactivated for userId '{}'", userId);
+            throw new IllegalArgumentException("Account is deactivated");
+        }
+
+        // Extract role from JWT token
+        Role tokenRole = jwtService.extractRole(token);
+        List<String> roles = new ArrayList<>();
+        roles.add("USER");
+        roles.add(tokenRole.name());
+
+        // Determine registered roles by checking if user has completed onboarding for each role
+        List<String> registeredRoles = new ArrayList<>();
+        
+        if (customerRepository.findByUserId(userId).isPresent()) {
+            registeredRoles.add("CUSTOMER");
+        }
+        if (restaurantRepository.findByUserId(userId).isPresent()) {
+            registeredRoles.add("RESTAURANT");
+        }
+        if (riderRepository.findByUserId(userId).isPresent()) {
+            registeredRoles.add("RIDER");
+        }
+
+        UserProfileResponseDTO.UserProfileData.UserProfileDataBuilder dataBuilder = UserProfileResponseDTO.UserProfileData.builder()
+                .roles(roles)
+                .registeredRoles(registeredRoles)
+                .userId(user.getUserId().toString())
+                .email(user.getUserName()) // Using username as email since User entity doesn't have email field
+                .phone(user.getPhoneNumber());
+
+        // Fetch rider data if user is a registered rider
+        if (riderRepository.findByUserId(userId).isPresent()) {
+            Rider rider = riderRepository.findByUserId(userId).get();
+            dataBuilder
+                    .riderId(rider.getRiderId() != null ? rider.getRiderId().toString() : null)
+                    .riderName(rider.getName())
+                    .riderAddress(rider.getAddress())
+                    .riderDob(rider.getDob())
+                    .riderGender(rider.getGender())
+                    .riderLat(rider.getLat())
+                    .riderLng(rider.getLng())
+                    .riderVehicleNumber(rider.getVehicleNumber())
+                    .riderDlNumber(rider.getDlNumber())
+                    .riderIsActive(rider.getIsActive())
+                    .riderIsVerified(rider.getIsVerified())
+                    .riderCreatedAt(rider.getCreatedAt())
+                    .riderUpdatedAt(rider.getUpdatedAt());
+        }
+
+        UserProfileResponseDTO.UserProfileData data = dataBuilder.build();
+
+        logger.info("User profile fetched successfully for userId: {}", userId);
+        return UserProfileResponseDTO.builder()
+                .success(true)
+                .message("User profile fetched successfully")
+                .data(data)
+                .build();
     }
 }

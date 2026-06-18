@@ -1,14 +1,37 @@
 package com.swigg.customer;
 
+import com.swigg.validation.MinimumAge;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class CustomerRegisterRequestDTO {
 
+    @NotBlank(message = "Address is required")
+    @Size(max = 500, message = "Address must not exceed 500 characters")
     private String address;
+    
+    @NotNull(message = "Date of birth is required")
+    @Past(message = "Date of birth must be in the past")
+    @MinimumAge(value = 18, message = "You must be at least 18 years old")
     private LocalDateTime dob;
+
+    @NotNull(message = "Gender is required")
     private Gender gender;
+
+    @NotNull(message = "Latitude is required")
+    @DecimalMin(value = "-90.0", message = "Latitude must be between -90 and 90")
+    @DecimalMax(value = "90.0", message = "Latitude must be between -90 and 90")
     private BigDecimal lat;
+
+    @NotNull(message = "Longitude is required")
+    @DecimalMin(value = "-180.0", message = "Longitude must be between -180 and 180")
+    @DecimalMax(value = "180.0", message = "Longitude must be between -180 and 180")
     private BigDecimal lng;
 
     public CustomerRegisterRequestDTO() {}
