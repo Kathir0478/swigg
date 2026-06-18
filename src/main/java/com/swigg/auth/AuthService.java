@@ -183,8 +183,8 @@ public class AuthService {
                 .email(user.getUserName()) // Using username as email since User entity doesn't have email field
                 .phone(user.getPhoneNumber());
 
-        // Fetch rider data if user is a registered rider
-        if (riderRepository.findByUserId(userId).isPresent()) {
+        // Fetch profile data based on the current authenticated role from JWT token
+        if (tokenRole == Role.RIDER && riderRepository.findByUserId(userId).isPresent()) {
             Rider rider = riderRepository.findByUserId(userId).get();
             dataBuilder
                     .riderId(rider.getRiderId() != null ? rider.getRiderId().toString() : null)
@@ -200,6 +200,35 @@ public class AuthService {
                     .riderIsVerified(rider.getIsVerified())
                     .riderCreatedAt(rider.getCreatedAt())
                     .riderUpdatedAt(rider.getUpdatedAt());
+        } else if (tokenRole == Role.RESTAURANT && restaurantRepository.findByUserId(userId).isPresent()) {
+            Restaurant restaurant = restaurantRepository.findByUserId(userId).get();
+            dataBuilder
+                    .restaurantId(restaurant.getRestaurantId() != null ? restaurant.getRestaurantId().toString() : null)
+                    .restaurantName(restaurant.getName())
+                    .restaurantDescription(restaurant.getDescription())
+                    .restaurantAddress(restaurant.getAddress())
+                    .restaurantLat(restaurant.getLat())
+                    .restaurantLng(restaurant.getLng())
+                    .restaurantImageUrl(restaurant.getImageUrl())
+                    .restaurantOpenTime(restaurant.getOpenTime())
+                    .restaurantCloseTime(restaurant.getCloseTime())
+                    .restaurantIsActive(restaurant.getIsActive())
+                    .restaurantIsVerified(restaurant.getIsVerified())
+                    .restaurantCreatedAt(restaurant.getCreatedAt())
+                    .restaurantUpdatedAt(restaurant.getUpdatedAt());
+        } else if (tokenRole == Role.CUSTOMER && customerRepository.findByUserId(userId).isPresent()) {
+            Customer customer = customerRepository.findByUserId(userId).get();
+            dataBuilder
+                    .customerId(customer.getCustomerId() != null ? customer.getCustomerId().toString() : null)
+                    .customerAddress(customer.getAddress())
+                    .customerDob(customer.getDob())
+                    .customerGender(customer.getGender())
+                    .customerLat(customer.getLat())
+                    .customerLng(customer.getLng())
+                    .customerIsActive(customer.getIsActive())
+                    .customerIsVerified(customer.getIsVerified())
+                    .customerCreatedAt(customer.getCreatedAt())
+                    .customerUpdatedAt(customer.getUpdatedAt());
         }
 
         UserProfileResponseDTO.UserProfileData data = dataBuilder.build();

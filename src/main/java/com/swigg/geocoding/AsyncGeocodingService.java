@@ -73,6 +73,11 @@ public class AsyncGeocodingService {
             ReverseGeocodingResponseDTO lookup = reverseGeocodeWithCache(lat, lng);
             String address = lookup.getAddress();
 
+            if (address == null || address.isBlank()) {
+                logger.warn("Reverse geocoding returned empty address for coordinates: {}, {}", lat, lng);
+                return;
+            }
+
             if ("CUSTOMER".equalsIgnoreCase(entityType)) {
                 customerRepository.findByUserId(userId).ifPresent(customer -> {
                     customer.setAddress(address);
@@ -94,8 +99,10 @@ public class AsyncGeocodingService {
             } else {
                 logger.warn("Unknown entity type for async geocoding: {}", entityType);
             }
+        } catch (IllegalArgumentException e) {
+            logger.error("Geocoding validation failed for user: {} of type: {}. Error: {}", userId, entityType, e.getMessage());
         } catch (Exception e) {
-            logger.error("Error in async address update for user: {}. Error: {}", userId, e.getMessage(), e);
+            logger.error("Error in async address update for user: {} of type: {}. Error: {}", userId, entityType, e.getMessage(), e);
         }
     }
 

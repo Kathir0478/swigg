@@ -1,5 +1,6 @@
 package com.swigg.restaurant;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.swigg.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMax;
@@ -37,6 +38,7 @@ public class Restaurant {
     @Column(name = "userid", nullable = false, updatable = false)
     private UUID userId;
 
+    @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "userid", referencedColumnName = "userid", insertable = false, updatable = false, foreignKey = @ForeignKey(name = "fk_restaurants_users"))
     private User user;
@@ -94,9 +96,11 @@ public class Restaurant {
 
     @CreationTimestamp
     @Column(name = "createdat", updatable = false)
+    @JsonIgnore
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updatedat")
+    @JsonIgnore
     private LocalDateTime updatedAt;
 }

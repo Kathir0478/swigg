@@ -10,7 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -33,7 +35,7 @@ public class RestaurantController {
 
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> registerRequest(Authentication authentication, @RequestBody RestaurantRegisterRequestDTO request) {
+    public ResponseEntity<?> registerRequest(Authentication authentication, @ModelAttribute RestaurantRegisterRequestDTO request) {
         UUID userId = UUID.fromString(authentication.getName());
         logger.info("Restaurant registration request received for userId: {}", userId);
         try {
@@ -147,6 +149,24 @@ public class RestaurantController {
         }
     }
 
+    @PostMapping("/update/image")
+    @PreAuthorize("hasRole('RESTAURANT')")
+    public ResponseEntity<?> updateRestaurantImage(Authentication authentication, @RequestParam("imageFile") MultipartFile imageFile) {
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Restaurant image update request received for userId: {}", userId);
+        try {
+            Restaurant updatedRestaurant = restaurantService.updateRestaurantImage(userId, imageFile);
+            logger.info("Restaurant image updated successfully for userId: {}", userId);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Restaurant image updated successfully",
+                    "restaurantId", updatedRestaurant.getRestaurantId()
+            ));
+        } catch (IllegalArgumentException e) {
+            logger.warn("Restaurant image update failed for userId: {}. Reason: {}", userId, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/list")
     public ResponseEntity<?> listRestaurants() {
         logger.info("List restaurants request received");
@@ -160,15 +180,16 @@ public class RestaurantController {
         }
     }
 
-    @GetMapping("/{restaurantId}")
-    public ResponseEntity<?> getRestaurant(@PathVariable UUID restaurantId) {
-        logger.info("Get restaurant request received for restaurantId: {}", restaurantId);
+    @GetMapping("/user")
+    public ResponseEntity<?> getRestaurantByAuth() {
+        UUID userId = UUID.fromString(SecurityContextHolder.getContext().getAuthentication().getName());
+        logger.info("Get restaurant request received for userId from auth: {}", userId);
         try {
-            Restaurant restaurant = restaurantService.getRestaurantById(restaurantId);
-            logger.info("Successfully fetched restaurant for restaurantId: {}", restaurantId);
+            Restaurant restaurant = restaurantService.getRestaurantByUserId(userId);
+            logger.info("Successfully fetched restaurant for userId: {}", userId);
             return ResponseEntity.ok(restaurant);
         } catch (IllegalArgumentException e) {
-            logger.warn("Failed to fetch restaurant for restaurantId: {}. Reason: {}", restaurantId, e.getMessage());
+            logger.warn("Failed to fetch restaurant for userId: {}. Reason: {}", userId, e.getMessage());
             if (e.getMessage().contains("not available")) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }
