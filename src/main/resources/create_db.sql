@@ -282,3 +282,5 @@ INSERT INTO orders (customerid, restaurantid, cartid, status, isactive) VALUES
 
 select * from users;
 select * from riders;
+
+select * from restaurants;

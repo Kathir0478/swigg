@@ -45,5 +45,32 @@ public class UserProfileResponseDTO {
         private Boolean riderIsVerified;
         private LocalDateTime riderCreatedAt;
         private LocalDateTime riderUpdatedAt;
+        
+        // Restaurant fields
+        private String restaurantId;
+        private String restaurantName;
+        private String restaurantDescription;
+        private String restaurantAddress;
+        private BigDecimal restaurantLat;
+        private BigDecimal restaurantLng;
+        private String restaurantImageUrl;
+        private java.time.LocalTime restaurantOpenTime;
+        private java.time.LocalTime restaurantCloseTime;
+        private Boolean restaurantIsActive;
+        private Boolean restaurantIsVerified;
+        private LocalDateTime restaurantCreatedAt;
+        private LocalDateTime restaurantUpdatedAt;
+        
+        // Customer fields
+        private String customerId;
+        private String customerAddress;
+        private LocalDateTime customerDob;
+        private Gender customerGender;
+        private BigDecimal customerLat;
+        private BigDecimal customerLng;
+        private Boolean customerIsActive;
+        private Boolean customerIsVerified;
+        private LocalDateTime customerCreatedAt;
+        private LocalDateTime customerUpdatedAt;
     }
 }

@@ -5,8 +5,8 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 public class RestaurantRegisterRequestDTO {
 
@@ -25,13 +25,12 @@ public class RestaurantRegisterRequestDTO {
     private BigDecimal lng;
 
     @NotNull(message = "Opening time is required")
-    private LocalDateTime opentime;
+    private String opentime;
 
     @NotNull(message = "Closing time is required")
-    private LocalDateTime closetime;
+    private String closetime;
 
-    @Size(max = 500, message = "Image URL must not exceed 500 characters")
-    private String imageurl;
+    private MultipartFile imageFile;
 
     public RestaurantRegisterRequestDTO() {}
 
@@ -59,27 +58,27 @@ public class RestaurantRegisterRequestDTO {
         this.lng = lng;
     }
 
-    public LocalDateTime getOpentime() {
+    public String getOpentime() {
         return opentime;
     }
 
-    public void setOpentime(LocalDateTime opentime) {
+    public void setOpentime(String opentime) {
         this.opentime = opentime;
     }
 
-    public LocalDateTime getClosetime() {
+    public String getClosetime() {
         return closetime;
     }
 
-    public void setClosetime(LocalDateTime closetime) {
+    public void setClosetime(String closetime) {
         this.closetime = closetime;
     }
 
-    public String getImageurl() {
-        return imageurl;
+    public MultipartFile getImageFile() {
+        return imageFile;
     }
 
-    public void setImageurl(String imageurl) {
-        this.imageurl = imageurl;
+    public void setImageFile(MultipartFile imageFile) {
+        this.imageFile = imageFile;
     }
 }

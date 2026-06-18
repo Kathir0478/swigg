@@ -1,5 +1,6 @@
 package com.swigg.rider;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.swigg.customer.Gender;
 import com.swigg.user.User;
 import jakarta.persistence.*;
@@ -35,6 +36,7 @@ public class Rider {
     @Column(name = "userid", nullable = false, updatable = false)
     private UUID userId;
 
+    @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "userid", referencedColumnName = "userid", insertable = false, updatable = false, foreignKey = @ForeignKey(name = "fk_riders_users"))
     private User user;
@@ -81,10 +83,12 @@ public class Rider {
 
     @CreationTimestamp
     @Column(name = "createdat", updatable = false)
+    @JsonIgnore
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updatedat")
+    @JsonIgnore
     private LocalDateTime updatedAt;
 }
 

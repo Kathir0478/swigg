@@ -5,6 +5,7 @@ import com.swigg.auth.AsyncOtpService;
 import com.swigg.auth.TokenResponseDTO;
 import com.swigg.auth.TotpService;
 import com.swigg.geocoding.AsyncGeocodingService;
+import com.swigg.filestorage.FileStorageService;
 import com.swigg.geocoding.GeocodingService;
 import com.swigg.messaging.OtpSentResponseDTO;
 import com.swigg.messaging.OtpService;
@@ -20,7 +21,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,6 +60,9 @@ public class RestaurantService {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
 
     @Transactional
     public RestaurantInitResponseDTO initiateRegister(UUID userId, RestaurantRegisterRequestDTO request) {
@@ -88,6 +95,31 @@ public class RestaurantService {
         }
         Restaurant existingRestaurant = restaurantRepository.findByUserId(userId).orElse(null);
         if (existingRestaurant == null) {
+            String imageUrl = null;
+            if (request.getImageFile() != null && !request.getImageFile().isEmpty()) {
+                imageUrl = fileStorageService.storeFile(request.getImageFile(), "restaurant");
+            }
+
+            // Parse ISO-8601 datetime strings to extract LocalTime
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
+            LocalTime openTime = null;
+            LocalTime closeTime = null;
+            
+            if (request.getOpentime() != null && !request.getOpentime().isBlank()) {
+                try {
+                    openTime = java.time.LocalDateTime.parse(request.getOpentime(), formatter).toLocalTime();
+                } catch (Exception e) {
+                    logger.warn("Failed to parse opentime: {}", request.getOpentime());
+                }
+            }
+            if (request.getClosetime() != null && !request.getClosetime().isBlank()) {
+                try {
+                    closeTime = java.time.LocalDateTime.parse(request.getClosetime(), formatter).toLocalTime();
+                } catch (Exception e) {
+                    logger.warn("Failed to parse closetime: {}", request.getClosetime());
+                }
+            }
+
             Restaurant restaurant = Restaurant.builder()
                     .userId(userId)
                     .user(user)
@@ -95,6 +127,9 @@ public class RestaurantService {
                     .description(request.getDescription())
                     .lat(request.getLat())
                     .lng(request.getLng())
+                    .imageUrl(imageUrl)
+                    .openTime(openTime)
+                    .closeTime(closeTime)
                     .isActive(true)
                     .isVerified(false)
                     .build();
@@ -285,6 +320,9 @@ public class RestaurantService {
     @CacheEvict(value = {"restaurant", "restaurants"}, allEntries = true)
     public Restaurant updateRestaurant(UUID userId, RestaurantUpdateRequestDTO request) {
         logger.info("Restaurant update requested for userId: {}", userId);
+        logger.debug("Request payload: name={}, description={}, openTime={}, closeTime={}, lat={}, lng={}",
+                request.getName(), request.getDescription(), request.getOpenTime(), request.getCloseTime(),
+                request.getLat(), request.getLng());
 
         Restaurant restaurant = restaurantRepository.findByUserId(userId)
                 .orElseThrow(() -> {
@@ -297,36 +335,107 @@ public class RestaurantService {
             throw new IllegalArgumentException("Account is deactivated");
         }
 
+        // Preserve existing address to prevent overwriting with null
+        String existingAddress = restaurant.getAddress();
+
+        boolean anyFieldUpdated = false;
+
         if (request.getName() != null && !request.getName().isBlank()) {
+            logger.info("Updating name from '{}' to '{}'", restaurant.getName(), request.getName());
             restaurant.setName(request.getName());
+            anyFieldUpdated = true;
         }
         if (request.getDescription() != null) {
+            logger.info("Updating description");
             restaurant.setDescription(request.getDescription());
+            anyFieldUpdated = true;
         }
-        if (request.getOpenTime() != null) {
-            restaurant.setOpenTime(request.getOpenTime());
+        if (request.getOpenTime() != null && !request.getOpenTime().isBlank()) {
+            try {
+                DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
+                LocalTime openTime = java.time.LocalDateTime.parse(request.getOpenTime(), formatter).toLocalTime();
+                logger.info("Updating openTime from '{}' to '{}'", restaurant.getOpenTime(), openTime);
+                restaurant.setOpenTime(openTime);
+                anyFieldUpdated = true;
+            } catch (Exception e) {
+                logger.warn("Failed to parse openTime: {}", request.getOpenTime());
+            }
         }
-        if (request.getCloseTime() != null) {
-            restaurant.setCloseTime(request.getCloseTime());
-        }
-        if (request.getImageUrl() != null) {
-            restaurant.setImageUrl(request.getImageUrl());
+        if (request.getCloseTime() != null && !request.getCloseTime().isBlank()) {
+            try {
+                DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
+                LocalTime closeTime = java.time.LocalDateTime.parse(request.getCloseTime(), formatter).toLocalTime();
+                logger.info("Updating closeTime from '{}' to '{}'", restaurant.getCloseTime(), closeTime);
+                restaurant.setCloseTime(closeTime);
+                anyFieldUpdated = true;
+            } catch (Exception e) {
+                logger.warn("Failed to parse closeTime: {}", request.getCloseTime());
+            }
         }
         boolean coordinatesChanged = false;
         if (request.getLat() != null) {
+            logger.info("Updating lat from '{}' to '{}'", restaurant.getLat(), request.getLat());
             restaurant.setLat(request.getLat());
             coordinatesChanged = true;
+            anyFieldUpdated = true;
         }
         if (request.getLng() != null) {
+            logger.info("Updating lng from '{}' to '{}'", restaurant.getLng(), request.getLng());
             restaurant.setLng(request.getLng());
             coordinatesChanged = true;
+            anyFieldUpdated = true;
         }
 
+        if (!anyFieldUpdated) {
+            logger.warn("No fields were updated for userId: {}", userId);
+            throw new IllegalArgumentException("No fields provided for update");
+        }
+
+        // Always preserve the existing address to prevent overwriting
+        restaurant.setAddress(existingAddress);
+        logger.debug("Preserved existing address for restaurant: {}", existingAddress);
+
         Restaurant updatedRestaurant = restaurantRepository.save(restaurant);
+        logger.info("Restaurant saved to database for userId: {}", userId);
         if (coordinatesChanged) {
             asyncGeocodingService.scheduleAddressUpdate(restaurant.getLat(), restaurant.getLng(), userId, "RESTAURANT");
         }
         logger.info("Restaurant updated successfully for userId: {}", userId);
+        return updatedRestaurant;
+    }
+
+    @Transactional
+    @CacheEvict(value = {"restaurant", "restaurants"}, allEntries = true)
+    public Restaurant updateRestaurantImage(UUID userId, MultipartFile imageFile) {
+        logger.info("Restaurant image update requested for userId: {}", userId);
+
+        Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Restaurant image update failed: restaurant not found for userId: {}", userId);
+                    return new IllegalArgumentException("Restaurant not found");
+                });
+
+        if (!Boolean.TRUE.equals(restaurant.getIsActive())) {
+            logger.warn("Restaurant image update failed: restaurant is deactivated for userId: {}", userId);
+            throw new IllegalArgumentException("Account is deactivated");
+        }
+
+        if (imageFile == null || imageFile.isEmpty()) {
+            logger.warn("Restaurant image update failed: no image file provided for userId: {}", userId);
+            throw new IllegalArgumentException("Image file is required");
+        }
+
+        // Delete old image if exists
+        if (restaurant.getImageUrl() != null) {
+            fileStorageService.deleteFile(restaurant.getImageUrl());
+        }
+
+        // Store new image
+        String imageUrl = fileStorageService.storeFile(imageFile, "restaurant");
+        restaurant.setImageUrl(imageUrl);
+
+        Restaurant updatedRestaurant = restaurantRepository.save(restaurant);
+        logger.info("Restaurant image updated successfully for userId: {}", userId);
         return updatedRestaurant;
     }
 
@@ -353,6 +462,24 @@ public class RestaurantService {
         }
 
         logger.info("Successfully fetched restaurant for restaurantId: {}", restaurantId);
+        return restaurant;
+    }
+
+    @Cacheable(value = "restaurant", key = "#userId")
+    public Restaurant getRestaurantByUserId(UUID userId) {
+        logger.info("Fetching restaurant for userId: {}", userId);
+        Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Restaurant not found for userId: {}", userId);
+                    return new IllegalArgumentException("Restaurant not found");
+                });
+
+        if (!Boolean.TRUE.equals(restaurant.getIsActive())) {
+            logger.warn("Restaurant is deactivated for userId: {}", userId);
+            throw new IllegalArgumentException("Restaurant is not available");
+        }
+
+        logger.info("Successfully fetched restaurant for userId: {}", userId);
         return restaurant;
     }
 

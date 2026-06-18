@@ -7,4 +7,13 @@ jwt:
 
 google:
   maps:
-    api-key: your-google-maps-api-key-here
+    api-key: ${GOOGLE_MAPS_API_KEY:your-google-maps-api-key-here}
+
+file:
+  upload-dir: ./uploads/restaurant-images
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
