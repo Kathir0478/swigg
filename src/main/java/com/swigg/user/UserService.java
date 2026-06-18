@@ -75,9 +75,9 @@ public class UserService {
 
     @Transactional
     public UUID createOrGetUser(String username, String phoneNumber, String password) {
-        User existingUser = userRepository.findByPhoneNumber(phoneNumber).orElse(null);
+        User existingActiveUser = userRepository.findByPhoneNumberAndIsActive(phoneNumber, true).orElse(null);
         UUID userId;
-        if (existingUser == null) {
+        if (existingActiveUser == null) {
             String totpSecret = totpService.generateSecret();
             String passwordHash = passwordEncoder.encode(password);
             User user = User.builder()
@@ -94,7 +94,7 @@ public class UserService {
             userId = savedUser.getUserId();
             logger.info("User created in database for username: {} with isVerified=false", username);
         } else {
-            userId = existingUser.getUserId();
+            userId = existingActiveUser.getUserId();
         }
         return userId;
     }
@@ -105,9 +105,9 @@ public class UserService {
         String totpCode = request.getOtpCode();
         logger.info("Signup verification started for phone: {}", phoneNumber);
 
-        User user = userRepository.findByPhoneNumber(phoneNumber)
+        User user = userRepository.findByPhoneNumberAndIsActive(phoneNumber, true)
                 .orElseThrow(() -> {
-                    logger.warn("Signup verification failed: no user found for phone: {}", phoneNumber);
+                    logger.warn("Signup verification failed: no active user found for phone: {}", phoneNumber);
                     return new IllegalArgumentException("User not found. Please signup first.");
                 });
 
@@ -199,9 +199,9 @@ public class UserService {
             throw new IllegalArgumentException("Phone number  is required");
         }
 
-        User user = userRepository.findByPhoneNumber(phoneNumber)
+        User user = userRepository.findByPhoneNumberAndIsActive(phoneNumber, true)
                 .orElseThrow(() -> {
-                    logger.warn("Login failed: user '{}' not found", username);
+                    logger.warn("Login failed: active user '{}' not found", username);
                     return new IllegalArgumentException("Invalid username or password");
                 });
 
@@ -236,9 +236,9 @@ public class UserService {
 
         logger.info("Login verification started for phone: {}", phoneNumber);
 
-        User user = userRepository.findByPhoneNumber(phoneNumber)
+        User user = userRepository.findByPhoneNumberAndIsActive(phoneNumber, true)
                 .orElseThrow(() -> {
-                    logger.warn("Login verification failed: no user found for phone: {}", phoneNumber);
+                    logger.warn("Login verification failed: no active user found for phone: {}", phoneNumber);
                     return new IllegalArgumentException("User not found");
                 });
 

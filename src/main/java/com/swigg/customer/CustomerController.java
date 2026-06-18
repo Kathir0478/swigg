@@ -1,6 +1,8 @@
 package com.swigg.customer;
 
+import com.swigg.auth.AuthService;
 import com.swigg.auth.TokenResponseDTO;
+import com.swigg.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,9 @@ public class CustomerController {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private AuthService authService;
+
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> registerRequest(Authentication authentication, @RequestBody CustomerRegisterRequestDTO request) {
@@ -49,9 +54,16 @@ public class CustomerController {
         try {
             Customer customer = customerService.completeRegister(userId, request.getOtpCode());
             logger.info("Customer registration verified for userId: {}", userId);
+            
+            // Generate new JWT tokens with CUSTOMER role
+            User user = customer.getUser();
+            TokenResponseDTO tokens = authService.generateTokensForUser(user);
+            
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "message", "Customer registered and verified successfully",
-                    "customerId", customer.getCustomerId()
+                    "customerId", customer.getCustomerId(),
+                    "accessToken", tokens.getAccessToken(),
+                    "refreshToken", tokens.getRefreshToken()
             ));
         } catch (IllegalArgumentException e) {
             logger.warn("Customer registration verification failed for userId: {}. Reason: {}", userId, e.getMessage());
@@ -76,7 +88,7 @@ public class CustomerController {
     public ResponseEntity<?> loginVerify(@RequestBody CustomerLoginVerifyRequestDTO request) {
         logger.info("Customer login verification request received for phone: {}", request.getPhoneNumber());
         try {
-            Customer tempCustomer = customerRepository.findByUser_PhoneNumber(request.getPhoneNumber())
+            Customer tempCustomer = customerRepository.findByUser_PhoneNumberAndUser_IsActive(request.getPhoneNumber(), true)
                     .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
             TokenResponseDTO response = customerService.completeLogin(tempCustomer.getCustomerId(), request.getOtpCode());
             logger.info("Customer login successful and tokens issued for phone: {}", request.getPhoneNumber());
@@ -157,6 +169,9 @@ public class CustomerController {
             return ResponseEntity.ok(customer);
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to fetch customer for customerId: {}. Reason: {}", customerId, e.getMessage());
+            if (e.getMessage().contains("not available")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

@@ -1,6 +1,8 @@
 package com.swigg.rider;
 
+import com.swigg.auth.AuthService;
 import com.swigg.auth.TokenResponseDTO;
+import com.swigg.user.User;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,9 @@ public class RiderController {
     @Autowired
     private RiderRepository riderRepository;
 
+    @Autowired
+    private AuthService authService;
+
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> registerRequest(Authentication authentication, @Valid @RequestBody RiderRegisterRequestDTO request) {
@@ -50,9 +55,16 @@ public class RiderController {
         try {
             Rider rider = riderService.completeRegister(userId, request.getOtpCode());
             logger.info("Rider registration verified for userId: {}", userId);
+            
+            // Generate new JWT tokens with RIDER role
+            User user = rider.getUser();
+            TokenResponseDTO tokens = authService.generateTokensForUser(user);
+            
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "message", "Rider registered and verified successfully",
-                    "riderId", rider.getRiderId()
+                    "riderId", rider.getRiderId(),
+                    "accessToken", tokens.getAccessToken(),
+                    "refreshToken", tokens.getRefreshToken()
             ));
         } catch (IllegalArgumentException e) {
             logger.warn("Rider registration verification failed for userId: {}. Reason: {}", userId, e.getMessage());
@@ -77,7 +89,7 @@ public class RiderController {
     public ResponseEntity<?> loginVerify(@RequestBody RiderLoginVerifyRequestDTO request) {
         logger.info("Rider login verification request received for phone: {}", request.getPhoneNumber());
         try {
-            Rider tempRider = riderRepository.findByUser_PhoneNumber(request.getPhoneNumber())
+            Rider tempRider = riderRepository.findByUser_PhoneNumberAndUser_IsActive(request.getPhoneNumber(), true)
                     .orElseThrow(() -> new IllegalArgumentException("Rider not found"));
             TokenResponseDTO response = riderService.completeLogin(tempRider.getRiderId(), request.getOtpCode());
             logger.info("Rider login successful and tokens issued for phone: {}", request.getPhoneNumber());
@@ -158,6 +170,9 @@ public class RiderController {
             return ResponseEntity.ok(rider);
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to fetch rider for riderId: {}. Reason: {}", riderId, e.getMessage());
+            if (e.getMessage().contains("not available")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
