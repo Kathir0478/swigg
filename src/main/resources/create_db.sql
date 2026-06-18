@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE users (
     userid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(255) NOT NULL,
-    phonenumber VARCHAR(15) NOT NULL UNIQUE,
+    phonenumber VARCHAR(15) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'USER', 'CUSTOMER', 'RESTAURANT', 'RIDER')),
     totp_secret VARCHAR(255) NOT NULL,
@@ -21,6 +21,11 @@ CREATE TABLE users (
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_phonenumber ON users(phonenumber);
 CREATE INDEX idx_users_isactive_isverified ON users(isactive, isverified);
+
+-- Partial unique index to ensure only one active user per phone number
+CREATE UNIQUE INDEX idx_users_phonenumber_active 
+ON users(phonenumber) 
+WHERE isactive = true;
 
 -- ============================================
 -- CUSTOMERS TABLE
@@ -275,3 +280,5 @@ INSERT INTO cart_items (cartid, foodid) VALUES
 INSERT INTO orders (customerid, restaurantid, cartid, status, isactive) VALUES
 ((SELECT customerid FROM customers WHERE name = 'John Doe'), (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace'), (SELECT cartid FROM carts WHERE customerid = (SELECT customerid FROM customers WHERE name = 'John Doe')), 'PENDING', TRUE);
 
+select * from users;
+select * from riders;

@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -155,9 +156,9 @@ public class CustomerService {
             throw new IllegalArgumentException("Password is required");
         }
 
-        Customer customer = customerRepository.findByUser_PhoneNumber(request.getPhoneNumber())
+        Customer customer = customerRepository.findByUser_PhoneNumberAndUser_IsActive(request.getPhoneNumber(), true)
                 .orElseThrow(() -> {
-                    logger.warn("Customer login failed: customer '{}' not found", request.getUsername());
+                    logger.warn("Customer login failed: active customer '{}' not found", request.getUsername());
                     return new IllegalArgumentException("Invalid username or password");
                 });
 
@@ -272,6 +273,7 @@ public class CustomerService {
     }
 
     @Transactional
+    @CacheEvict(value = {"customer", "customers"}, allEntries = true)
     public Customer updateCustomer(UUID userId, CustomerUpdateRequestDTO request) {
         logger.info("Customer update requested for userId: {}", userId);
 
@@ -309,7 +311,6 @@ public class CustomerService {
         }
 
         Customer updatedCustomer = customerRepository.save(customer);
-        evictCustomerCache(updatedCustomer.getCustomerId());
         if (coordinatesChanged) {
             asyncGeocodingService.scheduleAddressUpdate(customer.getLat(), customer.getLng(), userId, "CUSTOMER");
         }

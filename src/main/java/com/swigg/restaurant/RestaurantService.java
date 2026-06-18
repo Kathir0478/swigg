@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -164,9 +165,9 @@ public class RestaurantService {
             throw new IllegalArgumentException("Password is required");
         }
 
-        Restaurant restaurant = restaurantRepository.findByUser_PhoneNumber(data.getPhoneNumber())
+        Restaurant restaurant = restaurantRepository.findByUser_PhoneNumberAndUser_IsActive(data.getPhoneNumber(), true)
                 .orElseThrow(() -> {
-                    logger.warn("Restaurant login failed: restaurant '{}' not found", data.getUsername());
+                    logger.warn("Restaurant login failed: active restaurant '{}' not found", data.getUsername());
                     return new IllegalArgumentException("Invalid username or password");
                 });
 
@@ -281,6 +282,7 @@ public class RestaurantService {
     }
 
     @Transactional
+    @CacheEvict(value = {"restaurant", "restaurants"}, allEntries = true)
     public Restaurant updateRestaurant(UUID userId, RestaurantUpdateRequestDTO request) {
         logger.info("Restaurant update requested for userId: {}", userId);
 
@@ -321,7 +323,6 @@ public class RestaurantService {
         }
 
         Restaurant updatedRestaurant = restaurantRepository.save(restaurant);
-        evictRestaurantCache(updatedRestaurant.getRestaurantId());
         if (coordinatesChanged) {
             asyncGeocodingService.scheduleAddressUpdate(restaurant.getLat(), restaurant.getLng(), userId, "RESTAURANT");
         }

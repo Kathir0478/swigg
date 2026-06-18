@@ -1,6 +1,8 @@
 package com.swigg.restaurant;
 
+import com.swigg.auth.AuthService;
 import com.swigg.auth.TokenResponseDTO;
+import com.swigg.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,9 @@ public class RestaurantController {
     @Autowired
     private RestaurantRepository restaurantRepository;
 
+    @Autowired
+    private AuthService authService;
+
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> registerRequest(Authentication authentication, @RequestBody RestaurantRegisterRequestDTO request) {
@@ -49,9 +54,16 @@ public class RestaurantController {
         try {
             Restaurant restaurant = restaurantService.completeRegister(userId, request.getOtpCode());
             logger.info("Restaurant registration verified for userId: {}", userId);
+            
+            // Generate new JWT tokens with RESTAURANT role
+            User user = restaurant.getUser();
+            TokenResponseDTO tokens = authService.generateTokensForUser(user);
+            
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "message", "Restaurant registered and verified successfully",
-                    "restaurantId", restaurant.getRestaurantId()
+                    "restaurantId", restaurant.getRestaurantId(),
+                    "accessToken", tokens.getAccessToken(),
+                    "refreshToken", tokens.getRefreshToken()
             ));
         } catch (IllegalArgumentException e) {
             logger.warn("Restaurant registration verification failed for userId: {}. Reason: {}", userId, e.getMessage());
@@ -76,7 +88,7 @@ public class RestaurantController {
     public ResponseEntity<?> loginVerify(@RequestBody RestaurantLoginVerifyRequestDTO request) {
         logger.info("Restaurant login verification request received for phone: {}", request.getPhoneNumber());
         try {
-            Restaurant tempRestaurant = restaurantRepository.findByUser_PhoneNumber(request.getPhoneNumber())
+            Restaurant tempRestaurant = restaurantRepository.findByUser_PhoneNumberAndUser_IsActive(request.getPhoneNumber(), true)
                     .orElseThrow(() -> new IllegalArgumentException("Restaurant not found"));
             TokenResponseDTO response = restaurantService.completeLogin(tempRestaurant.getRestaurantId(), request.getOtpCode());
             logger.info("Restaurant login successful and tokens issued for phone: {}", request.getPhoneNumber());
@@ -157,6 +169,9 @@ public class RestaurantController {
             return ResponseEntity.ok(restaurant);
         } catch (IllegalArgumentException e) {
             logger.warn("Failed to fetch restaurant for restaurantId: {}. Reason: {}", restaurantId, e.getMessage());
+            if (e.getMessage().contains("not available")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            }
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

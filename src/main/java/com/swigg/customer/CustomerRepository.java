@@ -12,6 +12,7 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     Optional<Customer> findByUserId(UUID userId);
     Optional<Customer> findById(UUID customerId);
     Optional<Customer> findByUser_PhoneNumber(String phoneNumber);
+    Optional<Customer> findByUser_PhoneNumberAndUser_IsActive(String phoneNumber, Boolean isActive);
     Optional<Customer> findByUser_UserName(String userName);
     List<Customer> findAll();
 }
