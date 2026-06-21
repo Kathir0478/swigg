@@ -14,9 +14,9 @@ import java.util.UUID;
 public class FoodResponseDTO {
 
     private UUID foodId;
-    private String name;
+    private String foodName;
     private String description;
-    private BigDecimal price;
+    private Integer price;
     private BigDecimal rating;
     private Integer reviewCount;
     private FoodCategory category;

@@ -57,4 +57,9 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
      */
     @Query("SELECT f FROM Food f WHERE f.restaurant.restaurantId = :restaurantId AND f.category = :category AND f.isActive = true ORDER BY f.rating DESC")
     List<Food> findByCategoryWithHighestRating(@Param("restaurantId") UUID restaurantId, @Param("category") FoodCategory category);
+
+    /**
+     * Find all active and available foods (for customers)
+     */
+    List<Food> findByIsActiveAndIsAvailable(Boolean isActive, Boolean isAvailable);
 }
