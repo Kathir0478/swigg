@@ -311,7 +311,7 @@ public class CartService {
         for (UUID foodId : foodIds) {
             Food food = foodRepository.findById(foodId).orElse(null);
             if (food != null) {
-                total = total.add(food.getPrice());
+                total = total.add(BigDecimal.valueOf(food.getPrice()));
             }
         }
 

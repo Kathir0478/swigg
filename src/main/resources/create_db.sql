@@ -127,9 +127,9 @@ CREATE INDEX idx_riders_geo ON riders(lat, lng);
 -- ============================================
 CREATE TABLE foods (
     foodid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
+    foodname VARCHAR(100) NOT NULL,
     description TEXT,
-    price NUMERIC(10, 2) NOT NULL,
+    price INTEGER NOT NULL,
     rating NUMERIC(2, 1) NOT NULL DEFAULT 0.0,
     reviewcount INT NOT NULL DEFAULT 0,
     category VARCHAR(20) NOT NULL CHECK (category IN ('VEG', 'NON_VEG', 'STARTER', 'BEVERAGE', 'DESSERT', 'SALAD', 'SOUP', 'MAIN_COURSE', 'SIDE_DISH', 'APPETIZER')),
@@ -141,8 +141,8 @@ CREATE TABLE foods (
     CONSTRAINT fk_foods_restaurants FOREIGN KEY (restaurantid)
         REFERENCES restaurants (restaurantid)
         ON DELETE RESTRICT,
-    CONSTRAINT chk_food_name_not_blank CHECK (length(trim(name)) > 0),
-    CONSTRAINT chk_food_price CHECK (price > 0.0),
+    CONSTRAINT chk_food_name_not_blank CHECK (length(trim(foodname)) > 0),
+    CONSTRAINT chk_food_price CHECK (price > 0),
     CONSTRAINT chk_food_rating CHECK (rating >= 0.0 AND rating <= 5.0),
     CONSTRAINT chk_food_reviewcount CHECK (reviewcount >= 0)
 );
@@ -260,27 +260,24 @@ INSERT INTO riders (userid, name, address, dob, gender, lat, lng, vehiclenumber,
 ((SELECT userid FROM users WHERE username = 'Mike Rider'), 'Mike Johnson', '789 Rider Rd, Chennai', '1988-08-20 00:00:00', 'MALE', 13.090000, 80.280000, 'TN123456', 'DL98765432');
 
 -- Insert sample foods
-INSERT INTO foods (name, description, price, category, restaurantid) VALUES
-('Margherita Pizza', 'Classic tomato and cheese pizza', 299.99, 'VEG', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
-('Pepperoni Pizza', 'Spicy pepperoni pizza', 349.99, 'NON_VEG', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
-('Garlic Bread', 'Crispy garlic bread', 99.99, 'STARTER', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
-('Coca Cola', 'Cold beverage', 49.99, 'BEVERAGE', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
-('Chocolate Cake', 'Rich chocolate dessert', 149.99, 'DESSERT', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace'));
+INSERT INTO foods (foodname, description, price, category, restaurantid) VALUES
+('Margherita Pizza', 'Classic tomato and cheese pizza', 299, 'VEG', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
+('Pepperoni Pizza', 'Spicy pepperoni pizza', 349, 'NON_VEG', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
+('Garlic Bread', 'Crispy garlic bread', 99, 'STARTER', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
+('Coca Cola', 'Cold beverage', 49, 'BEVERAGE', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace')),
+('Chocolate Cake', 'Rich chocolate dessert', 149, 'DESSERT', (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace'));
 
 -- Insert sample cart
 INSERT INTO carts (customerid, restaurantid, totalprice, status, isactive) VALUES
-((SELECT customerid FROM customers WHERE name = 'John Doe'), (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace'), 449.98, 'ACTIVE', TRUE);
+((SELECT customerid FROM customers WHERE name = 'John Doe'), (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace'), 398, 'ACTIVE', TRUE);
 
 -- Insert sample cart items
 INSERT INTO cart_items (cartid, foodid) VALUES
-((SELECT cartid FROM carts WHERE customerid = (SELECT customerid FROM customers WHERE name = 'John Doe')), (SELECT foodid FROM foods WHERE name = 'Margherita Pizza')),
-((SELECT cartid FROM carts WHERE customerid = (SELECT customerid FROM customers WHERE name = 'John Doe')), (SELECT foodid FROM foods WHERE name = 'Garlic Bread'));
+((SELECT cartid FROM carts WHERE customerid = (SELECT customerid FROM customers WHERE name = 'John Doe')), (SELECT foodid FROM foods WHERE foodname = 'Margherita Pizza')),
+((SELECT cartid FROM carts WHERE customerid = (SELECT customerid FROM customers WHERE name = 'John Doe')), (SELECT foodid FROM foods WHERE foodname = 'Garlic Bread'));
 
 -- Insert sample order
 INSERT INTO orders (customerid, restaurantid, cartid, status, isactive) VALUES
 ((SELECT customerid FROM customers WHERE name = 'John Doe'), (SELECT restaurantid FROM restaurants WHERE name = 'Pizza Palace'), (SELECT cartid FROM carts WHERE customerid = (SELECT customerid FROM customers WHERE name = 'John Doe')), 'PENDING', TRUE);
 
-select * from users;
-select * from riders;
-
-select * from restaurants;
+select * from foods;

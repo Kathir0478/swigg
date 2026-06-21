@@ -285,12 +285,12 @@ public class OrderService {
 
             if (!Boolean.TRUE.equals(food.getIsActive())) {
                 logger.warn("Food is inactive: {}", foodId);
-                throw new IllegalArgumentException("Food is no longer available: " + food.getName());
+                throw new IllegalArgumentException("Food is no longer available: " + food.getFoodName());
             }
 
             if (!Boolean.TRUE.equals(food.getIsAvailable())) {
                 logger.warn("Food is not available: {}", foodId);
-                throw new IllegalArgumentException("Food is currently unavailable: " + food.getName());
+                throw new IllegalArgumentException("Food is currently unavailable: " + food.getFoodName());
             }
         }
 

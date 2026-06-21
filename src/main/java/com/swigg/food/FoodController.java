@@ -1,6 +1,8 @@
 package com.swigg.food;
 
 import com.swigg.common.ApiResponse;
+import com.swigg.restaurant.Restaurant;
+import com.swigg.restaurant.RestaurantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,9 @@ public class FoodController {
     @Autowired
     private FoodService foodService;
 
+    @Autowired
+    private RestaurantRepository restaurantRepository;
+
     @PostMapping("/create")
     @PreAuthorize("hasRole('RESTAURANT')")
     public ResponseEntity<?> createFood(
@@ -31,7 +36,15 @@ public class FoodController {
             Authentication authentication) {
         try {
             logger.info("Food creation request received");
-            UUID restaurantId = UUID.fromString(authentication.getName());
+            UUID userId = UUID.fromString(authentication.getName());
+            
+            Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                    .orElseThrow(() -> {
+                        logger.warn("Restaurant not found for userId: {}", userId);
+                        return new IllegalArgumentException("Restaurant not found for this user");
+                    });
+            
+            UUID restaurantId = restaurant.getRestaurantId();
             FoodResponseDTO food = foodService.createFood(restaurantId, request);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -64,11 +77,19 @@ public class FoodController {
     @PreAuthorize("hasRole('RESTAURANT')")
     public ResponseEntity<?> updateFood(
             @PathVariable UUID foodId,
-            @Valid @RequestBody FoodRequestDTO request,
+            @RequestBody FoodUpdateRequestDTO request,
             Authentication authentication) {
         try {
             logger.info("Food update request received for foodId: {}", foodId);
-            UUID restaurantId = UUID.fromString(authentication.getName());
+            UUID userId = UUID.fromString(authentication.getName());
+            
+            Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                    .orElseThrow(() -> {
+                        logger.warn("Restaurant not found for userId: {}", userId);
+                        return new IllegalArgumentException("Restaurant not found for this user");
+                    });
+            
+            UUID restaurantId = restaurant.getRestaurantId();
             FoodResponseDTO food = foodService.updateFood(restaurantId, foodId, request);
 
             return ResponseEntity.ok(
@@ -104,7 +125,15 @@ public class FoodController {
             Authentication authentication) {
         try {
             logger.info("Food deletion request received for foodId: {}", foodId);
-            UUID restaurantId = UUID.fromString(authentication.getName());
+            UUID userId = UUID.fromString(authentication.getName());
+            
+            Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                    .orElseThrow(() -> {
+                        logger.warn("Restaurant not found for userId: {}", userId);
+                        return new IllegalArgumentException("Restaurant not found for this user");
+                    });
+            
+            UUID restaurantId = restaurant.getRestaurantId();
             foodService.deleteFood(restaurantId, foodId);
 
             return ResponseEntity.ok(
@@ -134,23 +163,42 @@ public class FoodController {
 
     @PatchMapping("/{foodId}/availability")
     @PreAuthorize("hasRole('RESTAURANT')")
-    public ResponseEntity<?> toggleAvailability(
+    public ResponseEntity<?> setAvailability(
             @PathVariable UUID foodId,
+            @RequestBody java.util.Map<String, Boolean> request,
             Authentication authentication) {
         try {
-            logger.info("Food availability toggle request received for foodId: {}", foodId);
-            UUID restaurantId = UUID.fromString(authentication.getName());
-            FoodResponseDTO food = foodService.toggleAvailability(restaurantId, foodId);
+            Boolean isAvailable = request.get("isAvailable");
+            if (isAvailable == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                        ApiResponse.<FoodResponseDTO>builder()
+                                .success(false)
+                                .message("isAvailable field is required")
+                                .build()
+                );
+            }
+            
+            logger.info("Food availability set request received for foodId: {} to: {}", foodId, isAvailable);
+            UUID userId = UUID.fromString(authentication.getName());
+            
+            Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                    .orElseThrow(() -> {
+                        logger.warn("Restaurant not found for userId: {}", userId);
+                        return new IllegalArgumentException("Restaurant not found for this user");
+                    });
+            
+            UUID restaurantId = restaurant.getRestaurantId();
+            FoodResponseDTO food = foodService.setAvailability(restaurantId, foodId, isAvailable);
 
             return ResponseEntity.ok(
                     ApiResponse.<FoodResponseDTO>builder()
                             .success(true)
-                            .message("Food availability toggled successfully")
+                            .message("Food availability set successfully")
                             .data(food)
                             .build()
             );
         } catch (IllegalArgumentException e) {
-            logger.warn("Availability toggle failed: {}", e.getMessage());
+            logger.warn("Availability set failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                     ApiResponse.<FoodResponseDTO>builder()
                             .success(false)
@@ -158,7 +206,7 @@ public class FoodController {
                             .build()
             );
         } catch (Exception e) {
-            logger.error("Availability toggle error", e);
+            logger.error("Availability set error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     ApiResponse.<FoodResponseDTO>builder()
                             .success(false)
@@ -168,12 +216,20 @@ public class FoodController {
         }
     }
 
-    @GetMapping("/restaurant/{restaurantId}")
-    @PreAuthorize("isAuthenticated()")
-    @Cacheable(value = "foods", key = "'restaurant_' + #restaurantId")
-    public ResponseEntity<?> getFoodsByRestaurant(
-            @PathVariable UUID restaurantId) {
+    @GetMapping("/restaurant")
+    @PreAuthorize("hasRole('RESTAURANT')")
+    @Cacheable(value = "foods", key = "'restaurant_' + #authentication.name")
+    public ResponseEntity<?> getFoodsByRestaurant(Authentication authentication) {
         try {
+            UUID userId = UUID.fromString(authentication.getName());
+            
+            Restaurant restaurant = restaurantRepository.findByUserId(userId)
+                    .orElseThrow(() -> {
+                        logger.warn("Restaurant not found for userId: {}", userId);
+                        return new IllegalArgumentException("Restaurant not found for this user");
+                    });
+            
+            UUID restaurantId = restaurant.getRestaurantId();
             logger.info("Fetching foods for restaurant: {}", restaurantId);
             List<FoodResponseDTO> foods = foodService.getFoodsByRestaurant(restaurantId);
 
@@ -185,8 +241,16 @@ public class FoodController {
                             .data(foods)
                             .build()
             );
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to fetch foods: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    ApiResponse.<List<FoodResponseDTO>>builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .build()
+            );
         } catch (Exception e) {
-            logger.error("Error fetching foods for restaurant", e);
+            logger.error("Error fetching foods", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     ApiResponse.<List<FoodResponseDTO>>builder()
                             .success(false)
@@ -326,6 +390,33 @@ public class FoodController {
             );
         } catch (Exception e) {
             logger.error("Error fetching top-rated foods", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    ApiResponse.<List<FoodResponseDTO>>builder()
+                            .success(false)
+                            .message("Internal server error")
+                            .build()
+            );
+        }
+    }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Cacheable(value = "foods", key = "'all_available'")
+    public ResponseEntity<?> getAllAvailableFoods() {
+        try {
+            logger.info("Fetching all available foods for customers");
+            List<FoodResponseDTO> foods = foodService.getAllAvailableFoods();
+
+            return ResponseEntity.ok(
+                    ApiResponse.<List<FoodResponseDTO>>builder()
+                            .success(true)
+                            .message("All available foods fetched successfully")
+                            .count(foods.size())
+                            .data(foods)
+                            .build()
+            );
+        } catch (Exception e) {
+            logger.error("Error fetching all available foods", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     ApiResponse.<List<FoodResponseDTO>>builder()
                             .success(false)

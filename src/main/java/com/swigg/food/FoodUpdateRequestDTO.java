@@ -3,7 +3,6 @@ package com.swigg.food;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
@@ -11,22 +10,18 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class FoodRequestDTO {
+public class FoodUpdateRequestDTO {
 
-    @NotBlank(message = "Food name is required")
     @Size(min = 3, max = 100, message = "Food name must be between 3 and 100 characters")
     private String foodName;
 
     @Size(max = 500, message = "Description cannot exceed 500 characters")
     private String description;
 
-    @NotNull(message = "Price is required")
     @Min(value = 1, message = "Price must be greater than 0")
     private Integer price;
 
-    @NotNull(message = "Category is required")
     private FoodCategory category;
 
-    @Builder.Default
-    private Boolean isAvailable = true;
+    private Boolean isAvailable;
 }

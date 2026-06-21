@@ -34,7 +34,7 @@ public class FoodService {
         }
 
         Food food = Food.builder()
-                .name(request.getName())
+                .foodName(request.getFoodName())
                 .description(request.getDescription())
                 .price(request.getPrice())
                 .category(request.getCategory())
@@ -52,11 +52,11 @@ public class FoodService {
     }
 
     /**
-     * Update food item (Only restaurants can do this)
+     * Update food item (Only restaurants can do this) - Partial update
      */
     @Transactional
     @CacheEvict(value = "foods", allEntries = true)
-    public FoodResponseDTO updateFood(UUID restaurantId, UUID foodId, FoodRequestDTO request) {
+    public FoodResponseDTO updateFood(UUID restaurantId, UUID foodId, FoodUpdateRequestDTO request) {
         logger.info("Updating food: {} for restaurant: {}", foodId, restaurantId);
 
         Food food = foodRepository.findByFoodIdAndRestaurantId(foodId, restaurantId)
@@ -65,11 +65,21 @@ public class FoodService {
                     return new IllegalArgumentException("Food not found or does not belong to this restaurant");
                 });
 
-        food.setName(request.getName());
-        food.setDescription(request.getDescription());
-        food.setPrice(request.getPrice());
-        food.setCategory(request.getCategory());
-        food.setIsAvailable(request.getIsAvailable() != null ? request.getIsAvailable() : food.getIsAvailable());
+        if (request.getFoodName() != null) {
+            food.setFoodName(request.getFoodName());
+        }
+        if (request.getDescription() != null) {
+            food.setDescription(request.getDescription());
+        }
+        if (request.getPrice() != null) {
+            food.setPrice(request.getPrice());
+        }
+        if (request.getCategory() != null) {
+            food.setCategory(request.getCategory());
+        }
+        if (request.getIsAvailable() != null) {
+            food.setIsAvailable(request.getIsAvailable());
+        }
 
         Food updatedFood = foodRepository.save(food);
         logger.info("Food updated successfully: {}", foodId);
@@ -78,12 +88,12 @@ public class FoodService {
     }
 
     /**
-     * Toggle food availability (Only restaurants can do this)
+     * Set food availability (Only restaurants can do this)
      */
     @Transactional
     @CacheEvict(value = "foods", allEntries = true)
-    public FoodResponseDTO toggleAvailability(UUID restaurantId, UUID foodId) {
-        logger.info("Toggling availability for food: {} in restaurant: {}", foodId, restaurantId);
+    public FoodResponseDTO setAvailability(UUID restaurantId, UUID foodId, Boolean isAvailable) {
+        logger.info("Setting availability for food: {} in restaurant: {} to: {}", foodId, restaurantId, isAvailable);
 
         Food food = foodRepository.findByFoodIdAndRestaurantId(foodId, restaurantId)
                 .orElseThrow(() -> {
@@ -91,9 +101,9 @@ public class FoodService {
                     return new IllegalArgumentException("Food not found or does not belong to this restaurant");
                 });
 
-        food.setIsAvailable(!food.getIsAvailable());
+        food.setIsAvailable(isAvailable);
         Food updatedFood = foodRepository.save(food);
-        logger.info("Food availability toggled: {} - isAvailable: {}", foodId, updatedFood.getIsAvailable());
+        logger.info("Food availability set: {} - isAvailable: {}", foodId, updatedFood.getIsAvailable());
 
         return mapToResponseDTO(updatedFood);
     }
@@ -118,7 +128,7 @@ public class FoodService {
     }
 
     /**
-     * Get all foods for a restaurant (Cached)
+     * Get all foods for a restaurant (Cached) - All active foods
      */
     @Cacheable(value = "foods", key = "'restaurant_' + #restaurantId")
     public List<FoodResponseDTO> getFoodsByRestaurant(UUID restaurantId) {
@@ -148,14 +158,17 @@ public class FoodService {
     }
 
     /**
-     * Get foods by category (Cached)
+     * Get foods by category (Cached) - Only available foods
      */
     @Cacheable(value = "foods", key = "'category_' + #restaurantId + '_' + #category")
     public List<FoodResponseDTO> getFoodsByCategory(UUID restaurantId, FoodCategory category) {
         logger.info("Fetching foods for category: {} in restaurant: {}", category, restaurantId);
 
-        List<Food> foods = foodRepository.findByRestaurantIdAndCategoryAndIsActive(restaurantId, category, true);
-        logger.info("Found {} foods for category: {} in restaurant: {}", foods.size(), category, restaurantId);
+        List<Food> foods = foodRepository.findByRestaurantIdAndCategoryAndIsActive(restaurantId, category, true)
+                .stream()
+                .filter(food -> Boolean.TRUE.equals(food.getIsAvailable()))
+                .collect(Collectors.toList());
+        logger.info("Found {} available foods for category: {} in restaurant: {}", foods.size(), category, restaurantId);
 
         return foods.stream()
                 .map(this::mapToResponseDTO)
@@ -163,7 +176,7 @@ public class FoodService {
     }
 
     /**
-     * Get single food by ID (Cached)
+     * Get single food by ID (Cached) - Only available foods
      */
     @Cacheable(value = "foods", key = "'food_' + #foodId")
     public FoodResponseDTO getFoodById(UUID foodId) {
@@ -175,18 +188,26 @@ public class FoodService {
                     return new IllegalArgumentException("Food not found");
                 });
 
+        if (!Boolean.TRUE.equals(food.getIsAvailable())) {
+            logger.warn("Food is not available: {}", foodId);
+            throw new IllegalArgumentException("Food is not available");
+        }
+
         return mapToResponseDTO(food);
     }
 
     /**
-     * Get foods sorted by rating (Cached)
+     * Get foods sorted by rating (Cached) - Only available foods
      */
     @Cacheable(value = "foods", key = "'category_rated_' + #restaurantId + '_' + #category")
     public List<FoodResponseDTO> getTopRatedFoodsByCategory(UUID restaurantId, FoodCategory category) {
         logger.info("Fetching top-rated foods for category: {} in restaurant: {}", category, restaurantId);
 
-        List<Food> foods = foodRepository.findByCategoryWithHighestRating(restaurantId, category);
-        logger.info("Found {} top-rated foods for category: {}", foods.size(), category);
+        List<Food> foods = foodRepository.findByCategoryWithHighestRating(restaurantId, category)
+                .stream()
+                .filter(food -> Boolean.TRUE.equals(food.getIsAvailable()))
+                .collect(Collectors.toList());
+        logger.info("Found {} top-rated available foods for category: {}", foods.size(), category);
 
         return foods.stream()
                 .map(this::mapToResponseDTO)
@@ -199,7 +220,7 @@ public class FoodService {
     private FoodResponseDTO mapToResponseDTO(Food food) {
         return FoodResponseDTO.builder()
                 .foodId(food.getFoodId())
-                .name(food.getName())
+                .foodName(food.getFoodName())
                 .description(food.getDescription())
                 .price(food.getPrice())
                 .rating(food.getRating())
@@ -211,5 +232,20 @@ public class FoodService {
                 .createdAt(food.getCreatedAt())
                 .updatedAt(food.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Get all available foods for customers (from all restaurants)
+     */
+    @Cacheable(value = "foods", key = "'all_available'")
+    public List<FoodResponseDTO> getAllAvailableFoods() {
+        logger.info("Fetching all available foods for customers");
+
+        List<Food> foods = foodRepository.findByIsActiveAndIsAvailable(true, true);
+        logger.info("Found {} available foods for customers", foods.size());
+
+        return foods.stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
     }
 }

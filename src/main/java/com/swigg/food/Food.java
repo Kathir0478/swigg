@@ -33,16 +33,16 @@ public class Food {
     private UUID foodId;
 
     @NotBlank(message = "Food name cannot be blank")
-    @Column(name = "name", nullable = false, length = 100)
-    private String name;
+    @Column(name = "foodname", nullable = false, length = 100)
+    private String foodName;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    @Min(value = 1, message = "Price must be greater than 0")
+    @Column(name = "price", nullable = false)
+    private Integer price;
 
     @Builder.Default
     @DecimalMin(value = "0.0", message = "Rating cannot be lower than 0")
