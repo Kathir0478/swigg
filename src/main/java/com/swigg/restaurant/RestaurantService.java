@@ -101,24 +101,8 @@ public class RestaurantService {
             }
 
             // Parse ISO-8601 datetime strings to extract LocalTime
-            DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
-            LocalTime openTime = null;
-            LocalTime closeTime = null;
-            
-            if (request.getOpentime() != null && !request.getOpentime().isBlank()) {
-                try {
-                    openTime = java.time.LocalDateTime.parse(request.getOpentime(), formatter).toLocalTime();
-                } catch (Exception e) {
-                    logger.warn("Failed to parse opentime: {}", request.getOpentime());
-                }
-            }
-            if (request.getClosetime() != null && !request.getClosetime().isBlank()) {
-                try {
-                    closeTime = java.time.LocalDateTime.parse(request.getClosetime(), formatter).toLocalTime();
-                } catch (Exception e) {
-                    logger.warn("Failed to parse closetime: {}", request.getClosetime());
-                }
-            }
+            LocalTime openTime = parseLocalTime(request.getOpenTime());
+            LocalTime closeTime = parseLocalTime(request.getCloseTime());
 
             Restaurant restaurant = Restaurant.builder()
                     .userId(userId)
@@ -351,24 +335,22 @@ public class RestaurantService {
             anyFieldUpdated = true;
         }
         if (request.getOpenTime() != null && !request.getOpenTime().isBlank()) {
-            try {
-                DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
-                LocalTime openTime = java.time.LocalDateTime.parse(request.getOpenTime(), formatter).toLocalTime();
+            LocalTime openTime = parseLocalTime(request.getOpenTime());
+            if (openTime != null) {
                 logger.info("Updating openTime from '{}' to '{}'", restaurant.getOpenTime(), openTime);
                 restaurant.setOpenTime(openTime);
                 anyFieldUpdated = true;
-            } catch (Exception e) {
+            } else {
                 logger.warn("Failed to parse openTime: {}", request.getOpenTime());
             }
         }
         if (request.getCloseTime() != null && !request.getCloseTime().isBlank()) {
-            try {
-                DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
-                LocalTime closeTime = java.time.LocalDateTime.parse(request.getCloseTime(), formatter).toLocalTime();
+            LocalTime closeTime = parseLocalTime(request.getCloseTime());
+            if (closeTime != null) {
                 logger.info("Updating closeTime from '{}' to '{}'", restaurant.getCloseTime(), closeTime);
                 restaurant.setCloseTime(closeTime);
                 anyFieldUpdated = true;
-            } catch (Exception e) {
+            } else {
                 logger.warn("Failed to parse closeTime: {}", request.getCloseTime());
             }
         }
@@ -498,5 +480,32 @@ public class RestaurantService {
         } catch (Exception e) {
             logger.error("Failed to evict restaurant cache for ID: {}", restaurantId, e);
         }
+    }
+
+    private LocalTime parseLocalTime(String timeStr) {
+        if (timeStr == null || timeStr.isBlank()) {
+            return null;
+        }
+        try {
+            return java.time.ZonedDateTime.parse(timeStr).toLocalTime();
+        } catch (Exception e) {
+            // ignore
+        }
+        try {
+            return java.time.LocalDateTime.parse(timeStr).toLocalTime();
+        } catch (Exception e) {
+            // ignore
+        }
+        try {
+            return java.time.OffsetDateTime.parse(timeStr).toLocalTime();
+        } catch (Exception e) {
+            // ignore
+        }
+        try {
+            return java.time.LocalTime.parse(timeStr);
+        } catch (Exception e) {
+            // ignore
+        }
+        return null;
     }
 }

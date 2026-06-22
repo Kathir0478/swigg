@@ -3,6 +3,7 @@ package com.swigg.restaurant;
 import com.swigg.auth.AuthService;
 import com.swigg.auth.TokenResponseDTO;
 import com.swigg.user.User;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +36,7 @@ public class RestaurantController {
 
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> registerRequest(Authentication authentication, @ModelAttribute RestaurantRegisterRequestDTO request) {
+    public ResponseEntity<?> registerRequest(Authentication authentication, @Valid @ModelAttribute RestaurantRegisterRequestDTO request) {
         UUID userId = UUID.fromString(authentication.getName());
         logger.info("Restaurant registration request received for userId: {}", userId);
         try {
@@ -168,6 +169,7 @@ public class RestaurantController {
     }
 
     @GetMapping("/list")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<?> listRestaurants() {
         logger.info("List restaurants request received");
         try {

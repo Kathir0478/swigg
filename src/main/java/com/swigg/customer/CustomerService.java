@@ -326,22 +326,37 @@ public class CustomerService {
         return customers;
     }
 
-    @Cacheable(value = "customer", key = "#customerId")
-    public Customer getCustomerById(UUID customerId) {
-        logger.info("Fetching customer for customerId: {}", customerId);
-        Customer customer = customerRepository.findById(customerId)
+    @Cacheable(value = "customer", key = "#userId")
+    public CustomerResponseDTO getCustomerByUserId(UUID userId) {
+        logger.info("Fetching customer for userId: {}", userId);
+        Customer customer = customerRepository.findByUserId(userId)
                 .orElseThrow(() -> {
-                    logger.warn("Customer not found for customerId: {}", customerId);
+                    logger.warn("Customer not found for userId: {}", userId);
                     return new IllegalArgumentException("Customer not found");
                 });
 
         if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            logger.warn("Customer is deactivated for customerId: {}", customerId);
+            logger.warn("Customer is deactivated for userId: {}", userId);
             throw new IllegalArgumentException("Customer is not available");
         }
 
-        logger.info("Successfully fetched customer for customerId: {}", customerId);
-        return customer;
+        CustomerResponseDTO responseDTO = CustomerResponseDTO.builder()
+                .customerId(customer.getCustomerId())
+                .userId(customer.getUserId())
+                .name(customer.getName())
+                .address(customer.getAddress())
+                .dob(customer.getDob())
+                .gender(customer.getGender())
+                .lat(customer.getLat())
+                .lng(customer.getLng())
+                .isActive(customer.getIsActive())
+                .isVerified(customer.getIsVerified())
+                .createdAt(customer.getCreatedAt())
+                .updatedAt(customer.getUpdatedAt())
+                .build();
+
+        logger.info("Successfully fetched customer for userId: {}", userId);
+        return responseDTO;
     }
 
     private void evictCustomerCache(UUID customerId) {

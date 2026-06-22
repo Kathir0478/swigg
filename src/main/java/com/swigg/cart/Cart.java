@@ -30,6 +30,7 @@ public class Cart implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "cartid")
     private UUID cartId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -51,21 +52,21 @@ public class Cart implements Serializable {
     @Column(name = "foodid")
     private List<UUID> foodIds;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(name = "totalprice", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CartStatus status;
 
-    @Column(nullable = false)
+    @Column(name = "isactive", nullable = false)
     private Boolean isActive;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(name = "createdat", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(nullable = false)
+    @Column(name = "updatedat", nullable = false)
     private LocalDateTime updatedAt;
 }

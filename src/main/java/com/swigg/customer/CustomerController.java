@@ -160,15 +160,17 @@ public class CustomerController {
         }
     }
 
-    @GetMapping("/{customerId}")
-    public ResponseEntity<?> getCustomer(@PathVariable UUID customerId) {
-        logger.info("Get customer request received for customerId: {}", customerId);
+    @GetMapping("")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> getCustomer(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        logger.info("Get customer request received for userId: {}", userId);
         try {
-            Customer customer = customerService.getCustomerById(customerId);
-            logger.info("Successfully fetched customer for customerId: {}", customerId);
+            CustomerResponseDTO customer = customerService.getCustomerByUserId(userId);
+            logger.info("Successfully fetched customer for userId: {}", userId);
             return ResponseEntity.ok(customer);
         } catch (IllegalArgumentException e) {
-            logger.warn("Failed to fetch customer for customerId: {}. Reason: {}", customerId, e.getMessage());
+            logger.warn("Failed to fetch customer for userId: {}. Reason: {}", userId, e.getMessage());
             if (e.getMessage().contains("not available")) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
             }

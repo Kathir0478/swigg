@@ -8,8 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -36,6 +38,10 @@ public class AsyncGeocodingService {
     @Autowired
     private RiderRepository riderRepository;
 
+    @Autowired
+    @Lazy
+    private AsyncGeocodingService self;
+
     @Value("${cache.geocoding-ttl:3600}")
     private long geocodingCacheTtl;
 
@@ -58,15 +64,16 @@ public class AsyncGeocodingService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    updateAddressAsync(lat, lng, userId, entityType);
+                    self.updateAddressAsync(lat, lng, userId, entityType);
                 }
             });
         } else {
-            updateAddressAsync(lat, lng, userId, entityType);
+            self.updateAddressAsync(lat, lng, userId, entityType);
         }
     }
 
     @Async
+    @Transactional
     public void updateAddressAsync(BigDecimal lat, BigDecimal lng, UUID userId, String entityType) {
         try {
             logger.info("Starting async address lookup and update for user: {} of type: {}", userId, entityType);
