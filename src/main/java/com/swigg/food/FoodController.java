@@ -261,7 +261,7 @@ public class FoodController {
     }
 
     @GetMapping("/restaurant/{restaurantId}/available")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Cacheable(value = "foods", key = "'restaurant_available_' + #restaurantId")
     public ResponseEntity<?> getAvailableFoodsByRestaurant(
             @PathVariable UUID restaurantId) {
@@ -390,6 +390,34 @@ public class FoodController {
             );
         } catch (Exception e) {
             logger.error("Error fetching top-rated foods", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    ApiResponse.<List<FoodResponseDTO>>builder()
+                            .success(false)
+                            .message("Internal server error")
+                            .build()
+            );
+        }
+    }
+
+    @GetMapping("/restaurant/{restaurantId}/menu")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Cacheable(value = "foods", key = "'restaurant_menu_' + #restaurantId")
+    public ResponseEntity<?> getMenuForRestaurant(
+            @PathVariable UUID restaurantId) {
+        try {
+            logger.info("Fetching menu for restaurant: {}", restaurantId);
+            List<FoodResponseDTO> foods = foodService.getAvailableFoodsByRestaurant(restaurantId);
+
+            return ResponseEntity.ok(
+                    ApiResponse.<List<FoodResponseDTO>>builder()
+                            .success(true)
+                            .message("Menu fetched successfully")
+                            .count(foods.size())
+                            .data(foods)
+                            .build()
+            );
+        } catch (Exception e) {
+            logger.error("Error fetching menu", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     ApiResponse.<List<FoodResponseDTO>>builder()
                             .success(false)

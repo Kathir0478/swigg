@@ -25,10 +25,10 @@ public class RestaurantRegisterRequestDTO {
     private BigDecimal lng;
 
     @NotNull(message = "Opening time is required")
-    private String opentime;
+    private String openTime;
 
     @NotNull(message = "Closing time is required")
-    private String closetime;
+    private String closeTime;
 
     private MultipartFile imageFile;
 
@@ -58,20 +58,20 @@ public class RestaurantRegisterRequestDTO {
         this.lng = lng;
     }
 
-    public String getOpentime() {
-        return opentime;
+    public String getOpenTime() {
+        return openTime;
     }
 
-    public void setOpentime(String opentime) {
-        this.opentime = opentime;
+    public void setOpenTime(String openTime) {
+        this.openTime = openTime;
     }
 
-    public String getClosetime() {
-        return closetime;
+    public String getCloseTime() {
+        return closeTime;
     }
 
-    public void setClosetime(String closetime) {
-        this.closetime = closetime;
+    public void setCloseTime(String closeTime) {
+        this.closeTime = closeTime;
     }
 
     public MultipartFile getImageFile() {

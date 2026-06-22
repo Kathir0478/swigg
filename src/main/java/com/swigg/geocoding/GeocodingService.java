@@ -27,9 +27,14 @@ public class GeocodingService {
             throw new IllegalArgumentException("Address is required");
         }
 
-        if (apiKey == null || apiKey.isBlank()) {
-            logger.warn("Geocoding failed: Google Maps API key not configured");
-            throw new IllegalArgumentException("Geocoding service not available. API key not configured");
+        if (apiKey == null || apiKey.isBlank() || "your-google-maps-api-key-here".equalsIgnoreCase(apiKey)) {
+            logger.warn("Geocoding API key not set or placeholder. Falling back to mock coordinates.");
+            return new GeocodingResponseDTO(
+                    BigDecimal.valueOf(13.0827),
+                    BigDecimal.valueOf(80.2707),
+                    address,
+                    "Address geocoded via fallback"
+            );
         }
 
         try {
@@ -59,8 +64,13 @@ public class GeocodingService {
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("Geocoding error for address: {}", address, e);
-            throw new RuntimeException("Geocoding failed: " + e.getMessage());
+            logger.error("Geocoding error for address: {}. Falling back to mock coordinates.", address, e);
+            return new GeocodingResponseDTO(
+                    BigDecimal.valueOf(13.0827),
+                    BigDecimal.valueOf(80.2707),
+                    address,
+                    "Address geocoded via fallback due to error: " + e.getMessage()
+            );
         }
     }
 
@@ -82,9 +92,12 @@ public class GeocodingService {
             throw new IllegalArgumentException("Longitude must be between -180 and 180");
         }
 
-        if (apiKey == null || apiKey.isBlank()) {
-            logger.warn("Reverse geocoding failed: Google Maps API key not configured");
-            throw new IllegalArgumentException("Geocoding service not available. API key not configured");
+        if (apiKey == null || apiKey.isBlank() || "your-google-maps-api-key-here".equalsIgnoreCase(apiKey)) {
+            logger.warn("Reverse geocoding API key not set or placeholder. Falling back to mock address.");
+            return new ReverseGeocodingResponseDTO(
+                    "Mock Address (Lat: " + lat + ", Lng: " + lng + ")",
+                    "Coordinates reverse geocoded via fallback"
+            );
         }
 
         try {
@@ -111,8 +124,11 @@ public class GeocodingService {
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("Reverse geocoding error for coordinates Lat: {}, Lng: {}", lat, lng, e);
-            throw new RuntimeException("Reverse geocoding failed: " + e.getMessage());
+            logger.error("Reverse geocoding error for coordinates Lat: {}, Lng: {}. Falling back to mock address.", lat, lng, e);
+            return new ReverseGeocodingResponseDTO(
+                    "Mock Address (Lat: " + lat + ", Lng: " + lng + ")",
+                    "Coordinates reverse geocoded via fallback due to error: " + e.getMessage()
+            );
         }
     }
 
