@@ -12,12 +12,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CartResponseDTO {
+public class CartWithFoodDetailsResponseDTO {
 
     private UUID cartId;
     private UUID customerId;
     private UUID restaurantId;
-    private List<CartItemDetail> cartItems;
+    private List<FoodItemDetail> foodItems;
     private BigDecimal totalPrice;
     private CartStatus status;
     private Boolean isActive;
@@ -30,8 +30,12 @@ public class CartResponseDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class CartItemDetail {
+    public static class FoodItemDetail {
         private UUID foodId;
+        private String foodName;
+        private String description;
+        private Integer price;
+        private String category;
         private Integer quantity;
     }
 }

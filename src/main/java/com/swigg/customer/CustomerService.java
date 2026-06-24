@@ -359,6 +359,23 @@ public class CustomerService {
         return responseDTO;
     }
 
+    public Customer getCustomerEntityByUserId(UUID userId) {
+        logger.info("Fetching customer entity for userId: {}", userId);
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> {
+                    logger.warn("Customer not found for userId: {}", userId);
+                    return new IllegalArgumentException("Customer not found");
+                });
+
+        if (!Boolean.TRUE.equals(customer.getIsActive())) {
+            logger.warn("Customer is deactivated for userId: {}", userId);
+            throw new IllegalArgumentException("Customer is not available");
+        }
+
+        logger.info("Successfully fetched customer entity for userId: {}", userId);
+        return customer;
+    }
+
     private void evictCustomerCache(UUID customerId) {
         try {
             if (cacheManager != null) {
