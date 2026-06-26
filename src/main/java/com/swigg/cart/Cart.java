@@ -47,10 +47,8 @@ public class Cart implements Serializable {
     @Column(name = "restaurantid", insertable = false, updatable = false)
     private UUID restaurantId;
 
-    @ElementCollection(targetClass = UUID.class, fetch = FetchType.EAGER)
-    @CollectionTable(name = "cart_items", joinColumns = @JoinColumn(name = "cartid"))
-    @Column(name = "foodid")
-    private List<UUID> foodIds;
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<CartItem> cartItems;
 
     @Column(name = "totalprice", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;

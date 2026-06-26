@@ -1,6 +1,8 @@
 package com.swigg.order;
 
 import com.swigg.cart.Cart;
+import com.swigg.cart.CartItem;
+import com.swigg.cart.CartItemRepository;
 import com.swigg.cart.CartRepository;
 import com.swigg.cart.CartStatus;
 import com.swigg.customer.Customer;
@@ -47,6 +49,9 @@ public class OrderService {
     private FoodRepository foodRepository;
 
     @Autowired
+    private CartItemRepository cartItemRepository;
+
+    @Autowired
     private CacheManager cacheManager;
 
     @Transactional
@@ -88,12 +93,13 @@ public class OrderService {
             throw new IllegalArgumentException("Cart must be in ORDERED status to create an order");
         }
 
-        if (cart.getFoodIds() == null || cart.getFoodIds().isEmpty()) {
+        List<CartItem> cartItems = cartItemRepository.findByCartId(cart.getCartId());
+        if (cartItems == null || cartItems.isEmpty()) {
             logger.warn("Cannot create order with empty cart: {}", request.getCartId());
             throw new IllegalArgumentException("Cannot create order with empty cart");
         }
 
-        validateFoodAvailability(cart.getFoodIds());
+        validateFoodAvailabilityFromCartItems(cartItems);
 
         Restaurant restaurant = restaurantRepository.findById(cart.getRestaurantId())
                 .orElseThrow(() -> {
@@ -290,6 +296,30 @@ public class OrderService {
 
             if (!Boolean.TRUE.equals(food.getIsAvailable())) {
                 logger.warn("Food is not available: {}", foodId);
+                throw new IllegalArgumentException("Food is currently unavailable: " + food.getFoodName());
+            }
+        }
+
+        logger.info("All foods are available");
+    }
+
+    private void validateFoodAvailabilityFromCartItems(List<CartItem> cartItems) {
+        logger.info("Validating food availability for {} items", cartItems.size());
+
+        for (CartItem cartItem : cartItems) {
+            Food food = foodRepository.findById(cartItem.getFoodId())
+                    .orElseThrow(() -> {
+                        logger.warn("Food not found: {}", cartItem.getFoodId());
+                        return new IllegalArgumentException("Food not found: " + cartItem.getFoodId());
+                    });
+
+            if (!Boolean.TRUE.equals(food.getIsActive())) {
+                logger.warn("Food is inactive: {}", cartItem.getFoodId());
+                throw new IllegalArgumentException("Food is no longer available: " + food.getFoodName());
+            }
+
+            if (!Boolean.TRUE.equals(food.getIsAvailable())) {
+                logger.warn("Food is not available: {}", cartItem.getFoodId());
                 throw new IllegalArgumentException("Food is currently unavailable: " + food.getFoodName());
             }
         }

@@ -183,19 +183,28 @@ CREATE INDEX idx_carts_status ON carts(status);
 CREATE INDEX idx_carts_customerid_isactive ON carts(customerid, isactive);
 
 -- ============================================
--- CART_ITEMS TABLE (for @ElementCollection)
+-- CART_ITEMS TABLE (with quantity support)
 -- ============================================
 CREATE TABLE cart_items (
+    cartitemid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     cartid UUID NOT NULL,
     foodid UUID NOT NULL,
-    PRIMARY KEY (cartid, foodid),
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    createdat TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedat TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_cart_items_carts FOREIGN KEY (cartid)
         REFERENCES carts (cartid)
         ON DELETE CASCADE,
     CONSTRAINT fk_cart_items_foods FOREIGN KEY (foodid)
         REFERENCES foods (foodid)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT chk_cart_items_quantity CHECK (quantity > 0)
 );
+
+-- Indexes for cart_items table
+CREATE INDEX idx_cart_items_cartid ON cart_items(cartid);
+CREATE INDEX idx_cart_items_foodid ON cart_items(foodid);
+CREATE INDEX idx_cart_items_cartid_foodid ON cart_items(cartid, foodid);
 
 -- ============================================
 -- ORDERS TABLE

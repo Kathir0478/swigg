@@ -2,11 +2,17 @@ package com.swigg.restaurant;
 
 import com.swigg.auth.AuthService;
 import com.swigg.auth.TokenResponseDTO;
+import com.swigg.customer.Customer;
+import com.swigg.customer.CustomerService;
 import com.swigg.user.User;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +39,9 @@ public class RestaurantController {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private CustomerService customerService;
 
     @PostMapping("/register/request")
     @PreAuthorize("hasRole('USER')")
@@ -178,6 +187,64 @@ public class RestaurantController {
             return ResponseEntity.ok(restaurants);
         } catch (Exception e) {
             logger.warn("Failed to list restaurants. Reason: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/nearby")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> getNearbyRestaurants(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Nearby restaurants request received with page: {}, size: {}", page, size);
+        try {
+            UUID userId = UUID.fromString(authentication.getName());
+            
+            // Get customer details to extract lat/lng
+            Customer customer = customerService.getCustomerEntityByUserId(userId);
+            
+            // Get nearby restaurants sorted by distance
+            List<RestaurantResponseDTO> allNearbyRestaurants = restaurantService.getNearbyRestaurants(
+                customer.getLat(), 
+                customer.getLng()
+            );
+            
+            // Apply pagination
+            Pageable pageable = PageRequest.of(page, size);
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), allNearbyRestaurants.size());
+            
+            if (start >= allNearbyRestaurants.size()) {
+                return ResponseEntity.ok(Map.of(
+                    "restaurants", List.of(),
+                    "currentPage", page,
+                    "totalItems", 0,
+                    "totalPages", 0
+                ));
+            }
+            
+            List<RestaurantResponseDTO> paginatedRestaurants = allNearbyRestaurants.subList(start, end);
+            Page<RestaurantResponseDTO> restaurantPage = new PageImpl<>(
+                paginatedRestaurants, 
+                pageable, 
+                allNearbyRestaurants.size()
+            );
+            
+            logger.info("Successfully fetched {} nearby restaurants (page {} of {})", 
+                paginatedRestaurants.size(), page, restaurantPage.getTotalPages());
+            
+            return ResponseEntity.ok(Map.of(
+                "restaurants", restaurantPage.getContent(),
+                "currentPage", restaurantPage.getNumber(),
+                "totalItems", restaurantPage.getTotalElements(),
+                "totalPages", restaurantPage.getTotalPages()
+            ));
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to fetch nearby restaurants. Reason: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            logger.warn("Failed to fetch nearby restaurants. Reason: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -463,6 +464,60 @@ public class RestaurantService {
 
         logger.info("Successfully fetched restaurant for userId: {}", userId);
         return restaurant;
+    }
+
+    public List<RestaurantResponseDTO> getNearbyRestaurants(BigDecimal customerLat, BigDecimal customerLng) {
+        logger.info("Fetching nearby restaurants for customer location: {}, {}", customerLat, customerLng);
+        
+        List<Restaurant> restaurants = restaurantRepository.findByIsActive(true);
+        
+        List<RestaurantResponseDTO> responseDTOs = restaurants.stream()
+                .map(restaurant -> {
+                    BigDecimal distance = calculateDistance(customerLat, customerLng, restaurant.getLat(), restaurant.getLng());
+                    return RestaurantResponseDTO.builder()
+                            .restaurantId(restaurant.getRestaurantId())
+                            .userId(restaurant.getUserId())
+                            .name(restaurant.getName())
+                            .description(restaurant.getDescription())
+                            .openTime(restaurant.getOpenTime())
+                            .closeTime(restaurant.getCloseTime())
+                            .imageUrl(restaurant.getImageUrl())
+                            .address(restaurant.getAddress())
+                            .rating(restaurant.getRating())
+                            .reviewCount(restaurant.getReviewCount())
+                            .lat(restaurant.getLat())
+                            .lng(restaurant.getLng())
+                            .isActive(restaurant.getIsActive())
+                            .isVerified(restaurant.getIsVerified())
+                            .distance(distance)
+                            .createdAt(restaurant.getCreatedAt())
+                            .updatedAt(restaurant.getUpdatedAt())
+                            .build();
+                })
+                .sorted((r1, r2) -> r1.getDistance().compareTo(r2.getDistance()))
+                .toList();
+        
+        logger.info("Found {} nearby restaurants", responseDTOs.size());
+        return responseDTOs;
+    }
+
+    private BigDecimal calculateDistance(BigDecimal lat1, BigDecimal lng1, BigDecimal lat2, BigDecimal lng2) {
+        // Haversine formula to calculate distance in kilometers
+        double lat1Rad = Math.toRadians(lat1.doubleValue());
+        double lat2Rad = Math.toRadians(lat2.doubleValue());
+        double lng1Rad = Math.toRadians(lng1.doubleValue());
+        double lng2Rad = Math.toRadians(lng2.doubleValue());
+
+        double dLat = lat2Rad - lat1Rad;
+        double dLng = lng2Rad - lng1Rad;
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                   Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        double distance = 6371 * c; // Earth's radius in kilometers
+        return BigDecimal.valueOf(distance).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private void evictRestaurantCache(UUID restaurantId) {
